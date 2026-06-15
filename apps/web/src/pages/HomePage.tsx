@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react';
 import {
-  Alert,
   Button,
   Card,
   Col,
-  Descriptions,
   List,
   Row,
   Space,
@@ -16,47 +14,23 @@ import { Link } from 'react-router-dom';
 import { PageHeader } from '@/components/PageHeader';
 import { SectionCard } from '@/components/SectionCard';
 import { getCatalogOverview } from '@/services/catalogService';
-import { getDesktopAppInfo } from '@/services/desktopBridgeService';
-import { runBootstrapAgentsSync } from '@/services/syncService';
 import type { CatalogOverview } from '@shared/schemas/catalog';
-import type { DesktopAppInfo, RunSyncTaskResult } from '@shared/schemas/desktop';
 
 const { Paragraph, Text, Title } = Typography;
 
 export function HomePage() {
   const [overview, setOverview] = useState<CatalogOverview | null>(null);
-  const [appInfo, setAppInfo] = useState<DesktopAppInfo | null>(null);
-  const [syncRunning, setSyncRunning] = useState(false);
-  const [syncResult, setSyncResult] = useState<RunSyncTaskResult | null>(null);
 
   useEffect(() => {
     void getCatalogOverview().then(setOverview);
-    void getDesktopAppInfo().then(setAppInfo);
   }, []);
-
-  async function handleRunSync() {
-    setSyncRunning(true);
-    setSyncResult(null);
-
-    try {
-      const result = await runBootstrapAgentsSync();
-      setSyncResult(result);
-
-      if (result.ok) {
-        const nextOverview = await getCatalogOverview();
-        setOverview(nextOverview);
-      }
-    } finally {
-      setSyncRunning(false);
-    }
-  }
 
   return (
     <div className="page">
       <PageHeader
         title="首页"
         subtitle="以绳网情报站的方式组织攻略资料：左侧主阅读区承载核心条目，右侧情报栏承载更新、活动和维护说明。"
-        tags={['阶段三', '基础路由', '页面骨架']}
+        tags={['MVP', '资料首页', '同步已接入']}
       />
 
       <div className="home-grid">
@@ -94,9 +68,7 @@ export function HomePage() {
                 { title: '代理人', path: '/agents' },
                 { title: '音擎', path: '/weapons' },
                 { title: '驱动盘', path: '/drive-discs' },
-                { title: '配队', path: '/agents' },
-                { title: '材料', path: '/drive-discs' },
-                { title: '更新中心', path: '/' },
+                { title: '同步中心', path: '/sync-center' },
               ].map((item) => (
                 <Link key={item.title} to={item.path} className="quick-grid__item">
                   <div className="quick-grid__icon">{item.title.slice(0, 1)}</div>
@@ -137,55 +109,22 @@ export function HomePage() {
           </SectionCard>
 
           <SectionCard
-            title="同步入口"
-            description="通过 Electron 主进程受控调用 Python crawler，执行最小同步任务并把结果写回 SQLite。"
+            title="同步中心入口"
+            description="同步执行、日志查看和后续失败重试扩展统一收敛到同步中心，首页只保留概览入口。"
             extra={
-              <Button
-                type="primary"
-                loading={syncRunning}
-                disabled={appInfo?.bridgeStatus !== 'connected'}
-                onClick={() => void handleRunSync()}
-              >
-                手动同步角色样例
+              <Button type="primary">
+                <Link to="/sync-center">进入同步中心</Link>
               </Button>
             }
           >
-            {appInfo?.bridgeStatus !== 'connected' ? (
-              <Alert
-                type="warning"
-                showIcon
-                message="当前不是 Electron 桌面壳环境"
-                description="同步入口只能在 Electron 窗口中使用。如果你打开的是浏览器里的 http://127.0.0.1:5173，bridge 会不可用。请从桌面端开发命令启动应用后，在 Electron 窗口里执行同步。"
-              />
-            ) : syncResult ? (
-              <Space direction="vertical" size={12} style={{ display: 'flex' }}>
-                <Alert
-                  type={syncResult.ok ? 'success' : 'error'}
-                  showIcon
-                  message={syncResult.ok ? '同步执行成功' : '同步执行失败'}
-                  description={
-                    syncResult.ok
-                      ? `任务 ${syncResult.taskName} 已完成，写入 ${syncResult.recordCount} 条记录。`
-                      : syncResult.errorMessage
-                  }
-                />
-                <Descriptions size="small" column={1} bordered>
-                  <Descriptions.Item label="任务">{syncResult.taskName}</Descriptions.Item>
-                  <Descriptions.Item label="目标">{syncResult.target}</Descriptions.Item>
-                  <Descriptions.Item label="结果">
-                    {syncResult.ok ? syncResult.status : syncResult.errorCode}
-                  </Descriptions.Item>
-                  <Descriptions.Item label="输出路径">
-                    {syncResult.ok ? syncResult.output : '--'}
-                  </Descriptions.Item>
-                </Descriptions>
-              </Space>
-            ) : (
-              <Paragraph>
-                当前入口会真正触发 Python CLI：`python -m src.cli bootstrap_agents --target
-                sqlite`。
-              </Paragraph>
-            )}
+            <Paragraph>
+              当前 MVP 已经具备手动同步、最近状态和日志查看能力。同步任务实际通过
+              <Text code>{'React -> preload -> Electron -> Python -> SQLite'}</Text>
+              执行。
+            </Paragraph>
+            <Paragraph>
+              需要执行同步、查看最近日志或后续接入失败重试时，统一进入同步中心处理。
+            </Paragraph>
           </SectionCard>
 
           <SectionCard

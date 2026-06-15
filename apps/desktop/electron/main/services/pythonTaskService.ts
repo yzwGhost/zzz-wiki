@@ -7,6 +7,7 @@ import type {
   SyncTaskName,
   SyncTaskTarget,
 } from '../../../../../shared/schemas/desktop';
+import { syncLogRepository } from '../repositories/syncLogRepository';
 
 const execFileAsync = promisify(execFile);
 
@@ -151,19 +152,23 @@ async function executeWithCandidate(
 export const pythonTaskService = {
   async runTask(request: RunSyncTaskRequest): Promise<RunSyncTaskResult> {
     if (!ALLOWED_TASKS.has(request.taskName)) {
-      return createFailureResult(
+      const result = createFailureResult(
         request,
         'UNSUPPORTED_TASK',
         `Unsupported sync task: ${request.taskName}`,
       );
+      syncLogRepository.insertFailedRun(request, result);
+      return result;
     }
 
     if (!ALLOWED_TARGETS.has(request.target)) {
-      return createFailureResult(
+      const result = createFailureResult(
         request,
         'UNSUPPORTED_TARGET',
         `Unsupported sync target: ${request.target}`,
       );
+      syncLogRepository.insertFailedRun(request, result);
+      return result;
     }
 
     const candidates = getPythonCandidates();
@@ -171,7 +176,11 @@ export const pythonTaskService = {
 
     for (const candidate of candidates) {
       try {
-        return await executeWithCandidate(candidate, request);
+        const result = await executeWithCandidate(candidate, request);
+        if (!result.ok) {
+          syncLogRepository.insertFailedRun(request, result);
+        }
+        return result;
       } catch (error) {
         const executionError = error as NodeJS.ErrnoException;
         if (executionError.code === 'ENOENT') {
@@ -179,26 +188,32 @@ export const pythonTaskService = {
           continue;
         }
 
-        return createFailureResult(
+        const result = createFailureResult(
           request,
           'PROCESS_FAILED',
           executionError.message,
         );
+        syncLogRepository.insertFailedRun(request, result);
+        return result;
       }
     }
 
     if (missingExecutableCount === candidates.length) {
-      return createFailureResult(
+      const result = createFailureResult(
         request,
         'PYTHON_NOT_FOUND',
         'No available Python executable was found for the crawler task.',
       );
+      syncLogRepository.insertFailedRun(request, result);
+      return result;
     }
 
-    return createFailureResult(
+    const result = createFailureResult(
       request,
       'PROCESS_FAILED',
       'Crawler task failed before a Python process could be completed.',
     );
+    syncLogRepository.insertFailedRun(request, result);
+    return result;
   },
 };

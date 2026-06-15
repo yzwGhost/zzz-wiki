@@ -4,6 +4,8 @@ export const IPC_CHANNELS = {
   },
   sync: {
     runTask: 'sync:run-task',
+    getOverview: 'sync:get-overview',
+    getRecentLogs: 'sync:get-recent-logs',
   },
   catalog: {
     getOverview: 'catalog:get-overview',

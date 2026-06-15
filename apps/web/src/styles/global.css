@@ -57,8 +57,8 @@ img {
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 24px;
-  height: 76px;
-  padding: 0 28px;
+  min-height: 88px;
+  padding: 12px 28px;
   background: rgba(3, 3, 3, 0.9);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(14px);
@@ -68,6 +68,14 @@ img {
   display: flex;
   align-items: center;
   gap: 14px;
+}
+
+.shell-brand__copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-width: 0;
 }
 
 .shell-logo {
@@ -91,11 +99,20 @@ img {
   color: var(--text-muted) !important;
 }
 
+.shell-brand__eyebrow {
+  display: block;
+  line-height: 1.2;
+}
+
 .shell-brand__title.ant-typography,
 .page-header__title.ant-typography,
 .hero-banner__title.ant-typography {
   color: var(--text);
   margin: 0 !important;
+}
+
+.shell-brand__title.ant-typography {
+  line-height: 1.1;
 }
 
 .shell-nav {
@@ -146,7 +163,8 @@ img {
 }
 
 .shell-section-tag {
-  margin-top: 6px;
+  align-self: flex-start;
+  margin-top: 2px;
   color: var(--text) !important;
   border-color: rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.06);
@@ -226,6 +244,56 @@ img {
 .ant-descriptions-item-label,
 .ant-descriptions-item-content {
   color: var(--text) !important;
+}
+
+.ant-alert {
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.ant-alert .ant-alert-message {
+  font-weight: 700;
+}
+
+.ant-alert .ant-alert-message,
+.ant-alert .ant-alert-description,
+.ant-alert .ant-alert-icon {
+  color: var(--text) !important;
+}
+
+.ant-alert-warning {
+  background: rgba(246, 219, 47, 0.12) !important;
+  border-color: rgba(246, 219, 47, 0.28) !important;
+}
+
+.ant-alert-warning .ant-alert-icon {
+  color: var(--accent) !important;
+}
+
+.ant-alert-success {
+  background: rgba(82, 196, 26, 0.12) !important;
+  border-color: rgba(82, 196, 26, 0.24) !important;
+}
+
+.ant-alert-success .ant-alert-icon {
+  color: #7dff8a !important;
+}
+
+.ant-alert-error {
+  background: rgba(255, 77, 79, 0.12) !important;
+  border-color: rgba(255, 77, 79, 0.24) !important;
+}
+
+.ant-alert-error .ant-alert-icon {
+  color: #ff7f87 !important;
+}
+
+.ant-alert-info {
+  background: rgba(111, 126, 255, 0.12) !important;
+  border-color: rgba(111, 126, 255, 0.24) !important;
+}
+
+.ant-alert-info .ant-alert-icon {
+  color: #98a3ff !important;
 }
 
 .page-header {

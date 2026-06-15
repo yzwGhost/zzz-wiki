@@ -33,6 +33,12 @@ const api: DesktopApi = {
     runTask(request) {
       return ipcRenderer.invoke(IPC_CHANNELS.sync.runTask, request);
     },
+    getOverview() {
+      return ipcRenderer.invoke(IPC_CHANNELS.sync.getOverview);
+    },
+    getRecentLogs(limit) {
+      return ipcRenderer.invoke(IPC_CHANNELS.sync.getRecentLogs, limit);
+    },
   },
 };
 

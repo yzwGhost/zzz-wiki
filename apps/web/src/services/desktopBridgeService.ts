@@ -24,6 +24,8 @@ import type {
   DesktopAppInfo,
   RunSyncTaskRequest,
   RunSyncTaskResult,
+  SyncLogSummary,
+  SyncOverview,
 } from '@shared/schemas/desktop';
 
 function getBridge(): DesktopApi | undefined {
@@ -137,4 +139,33 @@ export async function runSyncTask(request: RunSyncTaskRequest): Promise<RunSyncT
   }
 
   return bridge.sync.runTask(request);
+}
+
+export async function getSyncOverview(): Promise<SyncOverview> {
+  const bridge = getBridge();
+
+  if (!bridge) {
+    return {
+      latestLog: null,
+      availableTasks: [
+        {
+          taskName: 'bootstrap_agents',
+          label: '角色样例同步',
+          targets: ['sqlite', 'json'],
+        },
+      ],
+    };
+  }
+
+  return bridge.sync.getOverview();
+}
+
+export async function getRecentSyncLogs(limit = 10): Promise<SyncLogSummary[]> {
+  const bridge = getBridge();
+
+  if (!bridge) {
+    return [];
+  }
+
+  return bridge.sync.getRecentLogs(limit);
 }

@@ -5,7 +5,7 @@ import type { DesktopAppInfo } from '../../../../shared/schemas/desktop';
 import { initializeDatabase } from './db/client';
 import { seedCatalogData } from './db/seed';
 import { catalogBridgeService } from './services/catalogBridgeService';
-import { pythonTaskService } from './services/pythonTaskService';
+import { syncBridgeService } from './services/syncBridgeService';
 
 const DEV_SERVER_URL = 'http://127.0.0.1:5173';
 
@@ -22,7 +22,11 @@ function createAppInfo(): DesktopAppInfo {
 
 function registerIpcHandlers() {
   ipcMain.handle(IPC_CHANNELS.app.getInfo, () => createAppInfo());
-  ipcMain.handle(IPC_CHANNELS.sync.runTask, (_, request) => pythonTaskService.runTask(request));
+  ipcMain.handle(IPC_CHANNELS.sync.runTask, (_, request) => syncBridgeService.runTask(request));
+  ipcMain.handle(IPC_CHANNELS.sync.getOverview, () => syncBridgeService.getOverview());
+  ipcMain.handle(IPC_CHANNELS.sync.getRecentLogs, (_, limit?: number) =>
+    syncBridgeService.getRecentLogs(limit),
+  );
   ipcMain.handle(IPC_CHANNELS.catalog.getOverview, () => catalogBridgeService.getOverview());
   ipcMain.handle(IPC_CHANNELS.catalog.queryAgents, (_, filters) =>
     catalogBridgeService.queryAgents(filters),

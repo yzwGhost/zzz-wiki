@@ -11,6 +11,7 @@ const navigationItems = [
   { key: '/agents', label: '代理人' },
   { key: '/weapons', label: '音擎' },
   { key: '/drive-discs', label: '驱动盘' },
+  { key: '/sync-center', label: '同步中心' },
 ];
 
 export function AppShell() {
@@ -22,6 +23,7 @@ export function AppShell() {
     agents: '代理人',
     weapons: '音擎',
     'drive-discs': '驱动盘',
+    'sync-center': '同步中心',
   } as const;
 
   return (
@@ -29,8 +31,8 @@ export function AppShell() {
       <Header className="shell-header">
         <div className="shell-header__brand">
           <div className="shell-logo">ZZZ</div>
-          <div>
-            <Text className="shell-brand__eyebrow">米游社 · 地区零</Text>
+          <div className="shell-brand__copy">
+            <Text className="shell-brand__eyebrow">新艾利都 · 本地攻略库</Text>
             <Title level={5} className="shell-brand__title">
               绳网情报站
             </Title>

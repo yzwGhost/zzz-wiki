@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-export type AppSection = 'home' | 'agents' | 'weapons' | 'drive-discs';
+export type AppSection = 'home' | 'agents' | 'weapons' | 'drive-discs' | 'sync-center';
 
 interface AppStoreState {
   activeSection: AppSection;

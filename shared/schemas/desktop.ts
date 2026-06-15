@@ -63,8 +63,32 @@ export interface SyncTaskFailureResult {
 
 export type RunSyncTaskResult = SyncTaskSuccessResult | SyncTaskFailureResult;
 
+export interface SyncLogSummary {
+  id: string;
+  taskName: string;
+  status: string;
+  startedAt: string;
+  finishedAt: string | null;
+  message: string;
+  target: SyncTaskTarget | null;
+  output: string | null;
+  recordCount: number | null;
+  errorCode: string | null;
+}
+
+export interface SyncOverview {
+  latestLog: SyncLogSummary | null;
+  availableTasks: Array<{
+    taskName: SyncTaskName;
+    label: string;
+    targets: SyncTaskTarget[];
+  }>;
+}
+
 export interface DesktopSyncApi {
   runTask: (request: RunSyncTaskRequest) => Promise<RunSyncTaskResult>;
+  getOverview: () => Promise<SyncOverview>;
+  getRecentLogs: (limit?: number) => Promise<SyncLogSummary[]>;
 }
 
 export interface DesktopApi {

@@ -103,4 +103,25 @@ export const CATALOG_SQL = {
       @id, @slug, @name, @type, @icon, @source_desc, @related_agents_json, @updated_at
     );
   `,
+  selectRecentSyncLogs: `
+    SELECT
+      id, task_name, status, started_at, finished_at, message, payload_json
+    FROM sync_logs
+    ORDER BY datetime(started_at) DESC, rowid DESC
+    LIMIT ?;
+  `,
+  selectLatestSyncLog: `
+    SELECT
+      id, task_name, status, started_at, finished_at, message, payload_json
+    FROM sync_logs
+    ORDER BY datetime(started_at) DESC, rowid DESC
+    LIMIT 1;
+  `,
+  insertSyncLog: `
+    INSERT OR REPLACE INTO sync_logs (
+      id, task_name, status, started_at, finished_at, message, payload_json
+    ) VALUES (
+      @id, @task_name, @status, @started_at, @finished_at, @message, @payload_json
+    );
+  `,
 } as const;
