@@ -1,0 +1,17 @@
+{
+  "name": "zzz-wiki",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.12.1",
+  "scripts": {
+    "desktop:repair": "pnpm --filter @zzz/desktop repair-electron",
+    "dev": "concurrently -k \"pnpm --filter @zzz/web dev\" \"pnpm --filter @zzz/desktop dev\"",
+    "build": "pnpm --filter @zzz/web build && pnpm --filter @zzz/desktop build"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["electron", "esbuild"]
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

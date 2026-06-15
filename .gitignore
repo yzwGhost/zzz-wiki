@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.vite/
+coverage/
+*.log
+storage/cache/**
+storage/logs/**
+storage/snapshots/**
+!storage/cache/.gitkeep
+!storage/logs/.gitkeep
+!storage/snapshots/.gitkeep
