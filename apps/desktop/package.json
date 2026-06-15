@@ -5,14 +5,21 @@
   "main": "dist/apps/desktop/electron/main/main.js",
   "scripts": {
     "repair-electron": "node scripts/ensure-electron.cjs",
-    "dev": "node scripts/ensure-electron.cjs && concurrently -k \"tsc -p tsconfig.json -w\" \"wait-on dist/apps/desktop/electron/main/main.js && electron .\"",
+    "repair-sqlite": "node scripts/ensure-better-sqlite3.cjs",
+    "repair-runtime": "node scripts/ensure-electron.cjs && node scripts/ensure-better-sqlite3.cjs",
+    "dev": "node scripts/ensure-electron.cjs && node scripts/ensure-better-sqlite3.cjs && concurrently -k \"tsc -p tsconfig.json -w\" \"wait-on dist/apps/desktop/electron/main/main.js && electron .\"",
     "build": "tsc -p tsconfig.json"
   },
   "devDependencies": {
+    "@electron/rebuild": "^3.7.1",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^22.15.30",
     "concurrently": "^9.1.2",
     "electron": "^36.4.0",
     "typescript": "^5.8.3",
     "wait-on": "^8.0.3"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.10.1"
   }
 }

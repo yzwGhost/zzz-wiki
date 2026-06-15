@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import {
+  Alert,
   Button,
   Card,
   Col,
+  Descriptions,
   List,
   Row,
   Space,
@@ -14,16 +16,40 @@ import { Link } from 'react-router-dom';
 import { PageHeader } from '@/components/PageHeader';
 import { SectionCard } from '@/components/SectionCard';
 import { getCatalogOverview } from '@/services/catalogService';
+import { getDesktopAppInfo } from '@/services/desktopBridgeService';
+import { runBootstrapAgentsSync } from '@/services/syncService';
 import type { CatalogOverview } from '@shared/schemas/catalog';
+import type { DesktopAppInfo, RunSyncTaskResult } from '@shared/schemas/desktop';
 
 const { Paragraph, Text, Title } = Typography;
 
 export function HomePage() {
   const [overview, setOverview] = useState<CatalogOverview | null>(null);
+  const [appInfo, setAppInfo] = useState<DesktopAppInfo | null>(null);
+  const [syncRunning, setSyncRunning] = useState(false);
+  const [syncResult, setSyncResult] = useState<RunSyncTaskResult | null>(null);
 
   useEffect(() => {
     void getCatalogOverview().then(setOverview);
+    void getDesktopAppInfo().then(setAppInfo);
   }, []);
+
+  async function handleRunSync() {
+    setSyncRunning(true);
+    setSyncResult(null);
+
+    try {
+      const result = await runBootstrapAgentsSync();
+      setSyncResult(result);
+
+      if (result.ok) {
+        const nextOverview = await getCatalogOverview();
+        setOverview(nextOverview);
+      }
+    } finally {
+      setSyncRunning(false);
+    }
+  }
 
   return (
     <div className="page">
@@ -108,6 +134,58 @@ export function HomePage() {
                 <Statistic title="版本" value={overview?.current_version ?? '--'} />
               </Col>
             </Row>
+          </SectionCard>
+
+          <SectionCard
+            title="同步入口"
+            description="通过 Electron 主进程受控调用 Python crawler，执行最小同步任务并把结果写回 SQLite。"
+            extra={
+              <Button
+                type="primary"
+                loading={syncRunning}
+                disabled={appInfo?.bridgeStatus !== 'connected'}
+                onClick={() => void handleRunSync()}
+              >
+                手动同步角色样例
+              </Button>
+            }
+          >
+            {appInfo?.bridgeStatus !== 'connected' ? (
+              <Alert
+                type="warning"
+                showIcon
+                message="当前不是 Electron 桌面壳环境"
+                description="同步入口只能在 Electron 窗口中使用。如果你打开的是浏览器里的 http://127.0.0.1:5173，bridge 会不可用。请从桌面端开发命令启动应用后，在 Electron 窗口里执行同步。"
+              />
+            ) : syncResult ? (
+              <Space direction="vertical" size={12} style={{ display: 'flex' }}>
+                <Alert
+                  type={syncResult.ok ? 'success' : 'error'}
+                  showIcon
+                  message={syncResult.ok ? '同步执行成功' : '同步执行失败'}
+                  description={
+                    syncResult.ok
+                      ? `任务 ${syncResult.taskName} 已完成，写入 ${syncResult.recordCount} 条记录。`
+                      : syncResult.errorMessage
+                  }
+                />
+                <Descriptions size="small" column={1} bordered>
+                  <Descriptions.Item label="任务">{syncResult.taskName}</Descriptions.Item>
+                  <Descriptions.Item label="目标">{syncResult.target}</Descriptions.Item>
+                  <Descriptions.Item label="结果">
+                    {syncResult.ok ? syncResult.status : syncResult.errorCode}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="输出路径">
+                    {syncResult.ok ? syncResult.output : '--'}
+                  </Descriptions.Item>
+                </Descriptions>
+              </Space>
+            ) : (
+              <Paragraph>
+                当前入口会真正触发 Python CLI：`python -m src.cli bootstrap_agents --target
+                sqlite`。
+              </Paragraph>
+            )}
           </SectionCard>
 
           <SectionCard

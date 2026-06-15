@@ -1,1 +1,1 @@
-# Phase 1 placeholder. Real crawler dependencies will be added with the first sync task.
+-e .

@@ -6,17 +6,38 @@ import { AgentFilterBar } from '@/features/agents/components/AgentFilterBar';
 import { AgentList } from '@/features/agents/components/AgentList';
 import { AgentSummaryStrip } from '@/features/agents/components/AgentSummaryStrip';
 import { queryAgents } from '@/services/catalogService';
+import { useAppStore } from '@/store/appStore';
+import { createFavoriteKey, useFavoriteStore } from '@/store/favoriteStore';
+import { useFilterStore } from '@/store/filterStore';
 import type { Agent, AgentListFilters } from '@shared/schemas/catalog';
 
 const { Text } = Typography;
 
 export function AgentListView() {
-  const [filters, setFilters] = useState<AgentListFilters>({});
   const [agents, setAgents] = useState<Agent[]>([]);
+  const filters = useFilterStore((state) => state.agentFilters);
+  const setAgentFilters = useFilterStore((state) => state.setAgentFilters);
+  const favorites = useFavoriteStore((state) => state.favorites);
+  const setActiveSection = useAppStore((state) => state.setActiveSection);
 
   useEffect(() => {
-    void queryAgents(filters).then(setAgents);
-  }, [filters]);
+    setActiveSection('agents');
+  }, [setActiveSection]);
+
+  useEffect(() => {
+    void queryAgents(filters).then((nextAgents) => {
+      if (!filters.favorite_only) {
+        setAgents(nextAgents);
+        return;
+      }
+
+      setAgents(
+        nextAgents.filter((agent) =>
+          Boolean(favorites[createFavoriteKey('agent', agent.id)]),
+        ),
+      );
+    });
+  }, [favorites, filters]);
 
   return (
     <div className="page">
@@ -30,7 +51,7 @@ export function AgentListView() {
         title="筛选面板"
         description="当前支持关键字搜索、属性筛选、定位筛选、稀有度筛选。筛选条件已经和数据访问层解耦。"
       >
-        <AgentFilterBar filters={filters} onFiltersChange={setFilters} />
+        <AgentFilterBar filters={filters} onFiltersChange={setAgentFilters} />
       </SectionCard>
 
       <SectionCard title="结果概览" extra={<Text>{agents.length} 名代理人</Text>}>

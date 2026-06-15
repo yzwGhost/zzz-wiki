@@ -1,5 +1,7 @@
-import { Avatar, Button, Input, Layout, Menu, Space, Tag, Typography } from 'antd';
+import { Avatar, Badge, Button, Input, Layout, Menu, Space, Tag, Typography } from 'antd';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { useAppStore } from '@/store/appStore';
+import { useFavoriteStore } from '@/store/favoriteStore';
 
 const { Header, Content } = Layout;
 const { Text, Title } = Typography;
@@ -13,6 +15,14 @@ const navigationItems = [
 
 export function AppShell() {
   const location = useLocation();
+  const activeSection = useAppStore((state) => state.activeSection);
+  const favoriteCount = useFavoriteStore((state) => Object.keys(state.favorites).length);
+  const activeSectionLabelMap = {
+    home: '首页',
+    agents: '代理人',
+    weapons: '音擎',
+    'drive-discs': '驱动盘',
+  } as const;
 
   return (
     <Layout className="shell">
@@ -24,6 +34,7 @@ export function AppShell() {
             <Title level={5} className="shell-brand__title">
               绳网情报站
             </Title>
+            <Tag className="shell-section-tag">{activeSectionLabelMap[activeSection]}</Tag>
           </div>
         </div>
 
@@ -43,9 +54,11 @@ export function AppShell() {
             prefix={<span className="shell-inline-icon">⌕</span>}
             className="shell-search"
           />
-          <Button type="text" shape="circle" className="shell-icon-button">
-            ◉
-          </Button>
+          <Badge count={favoriteCount} size="small">
+            <Button type="text" shape="circle" className="shell-icon-button">
+              ★
+            </Button>
+          </Badge>
           <Avatar className="shell-avatar">绳</Avatar>
         </Space>
       </Header>

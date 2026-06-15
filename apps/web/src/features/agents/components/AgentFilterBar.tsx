@@ -1,10 +1,12 @@
-import { Input, Select, Space } from 'antd';
+import { Input, Select, Space, Switch, Typography } from 'antd';
 import type { AgentElement, AgentListFilters, AgentRole, Rarity } from '@shared/schemas/catalog';
 import {
   agentElementOptions,
   agentRarityOptions,
   agentRoleOptions,
 } from '@/features/agents/constants';
+
+const { Text } = Typography;
 
 interface AgentFilterBarProps {
   filters: AgentListFilters;
@@ -81,6 +83,14 @@ export function AgentFilterBar({ filters, onFiltersChange }: AgentFilterBarProps
           }))}
           onChange={(rarities) => onFiltersChange({ ...filters, rarities })}
         />
+
+        <Space size={8} className="favorite-filter">
+          <Switch
+            checked={Boolean(filters.favorite_only)}
+            onChange={(checked) => onFiltersChange({ ...filters, favorite_only: checked })}
+          />
+          <Text>仅看收藏</Text>
+        </Space>
       </Space>
     </div>
   );

@@ -38,6 +38,20 @@ export interface AgentListFilters {
   elements?: AgentElement[];
   roles?: AgentRole[];
   rarities?: Rarity[];
+  favorite_only?: boolean;
+}
+
+export interface WeaponListFilters {
+  keyword?: string;
+  roles?: AgentRole[];
+  rarities?: Rarity[];
+  favorite_only?: boolean;
+}
+
+export interface DriveDiscListFilters {
+  keyword?: string;
+  fit_scenes?: string[];
+  favorite_only?: boolean;
 }
 
 export interface Weapon {
@@ -133,4 +147,13 @@ export interface WeaponDetailData {
 export interface DriveDiscDetailData {
   drive_disc: DriveDisc;
   recommended_agents: Agent[];
+}
+
+export type FavoriteTargetType = 'agent' | 'weapon' | 'drive_disc';
+
+export interface FavoriteRecord {
+  id: string;
+  target_type: FavoriteTargetType;
+  target_id: string;
+  created_at: string;
 }

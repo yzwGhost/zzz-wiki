@@ -1,6 +1,7 @@
 import { Space, Tag, Typography } from 'antd';
 import { Link } from 'react-router-dom';
 import type { Weapon } from '@shared/schemas/catalog';
+import { FavoriteToggleButton } from '@/components/FavoriteToggleButton';
 
 const { Paragraph, Text, Title } = Typography;
 
@@ -10,12 +11,19 @@ interface WeaponCardProps {
 
 export function WeaponCard({ weapon }: WeaponCardProps) {
   return (
-    <Link to={`/weapons/${weapon.slug}`} className="catalog-card">
+    <div className="catalog-card">
       <div className="catalog-card__cover catalog-card__cover--compact">
-        <div className="catalog-card__poster">
-          <span>W-ENGINE</span>
-          <strong>{weapon.name}</strong>
-        </div>
+        <Link to={`/weapons/${weapon.slug}`} className="catalog-card__media-link">
+          <div className="catalog-card__poster">
+            <span>W-ENGINE</span>
+            <strong>{weapon.name}</strong>
+          </div>
+        </Link>
+        <FavoriteToggleButton
+          targetType="weapon"
+          targetId={weapon.id}
+          className="favorite-toggle favorite-toggle--card"
+        />
       </div>
 
       <div className="catalog-card__body">
@@ -26,13 +34,15 @@ export function WeaponCard({ weapon }: WeaponCardProps) {
           ))}
         </Space>
 
-        <Title level={4}>{weapon.name}</Title>
+        <Title level={4}>
+          <Link to={`/weapons/${weapon.slug}`}>{weapon.name}</Link>
+        </Title>
         <Text className="catalog-card__meta">
           {weapon.base_stat} · {weapon.sub_stat}
         </Text>
         <Paragraph className="catalog-card__summary">{weapon.effect_desc}</Paragraph>
         <Text type="secondary">适配角色：{weapon.fit_agents.length} 名</Text>
       </div>
-    </Link>
+    </div>
   );
 }

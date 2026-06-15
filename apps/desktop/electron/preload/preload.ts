@@ -4,7 +4,35 @@ import type { DesktopApi } from '../../../../shared/schemas/desktop';
 
 const api: DesktopApi = {
   getAppInfo() {
-    return ipcRenderer.invoke(IPC_CHANNELS.getAppInfo);
+    return ipcRenderer.invoke(IPC_CHANNELS.app.getInfo);
+  },
+  catalog: {
+    getOverview() {
+      return ipcRenderer.invoke(IPC_CHANNELS.catalog.getOverview);
+    },
+    queryAgents(filters) {
+      return ipcRenderer.invoke(IPC_CHANNELS.catalog.queryAgents, filters);
+    },
+    getAgentDetailBySlug(slug) {
+      return ipcRenderer.invoke(IPC_CHANNELS.catalog.getAgentDetailBySlug, slug);
+    },
+    queryWeapons(filters) {
+      return ipcRenderer.invoke(IPC_CHANNELS.catalog.queryWeapons, filters);
+    },
+    getWeaponDetailBySlug(slug) {
+      return ipcRenderer.invoke(IPC_CHANNELS.catalog.getWeaponDetailBySlug, slug);
+    },
+    queryDriveDiscs(filters) {
+      return ipcRenderer.invoke(IPC_CHANNELS.catalog.queryDriveDiscs, filters);
+    },
+    getDriveDiscDetailBySlug(slug) {
+      return ipcRenderer.invoke(IPC_CHANNELS.catalog.getDriveDiscDetailBySlug, slug);
+    },
+  },
+  sync: {
+    runTask(request) {
+      return ipcRenderer.invoke(IPC_CHANNELS.sync.runTask, request);
+    },
   },
 };
 

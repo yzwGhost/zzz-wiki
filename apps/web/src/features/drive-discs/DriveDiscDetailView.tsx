@@ -1,16 +1,23 @@
 import { Alert, Button, Col, Row } from 'antd';
 import { Link, useParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { FavoriteToggleButton } from '@/components/FavoriteToggleButton';
 import { PageHeader } from '@/components/PageHeader';
 import { DriveDiscBasicSection } from '@/features/drive-discs/components/DriveDiscBasicSection';
 import { DriveDiscEffectsSection } from '@/features/drive-discs/components/DriveDiscEffectsSection';
 import { DriveDiscRecommendedAgentsSection } from '@/features/drive-discs/components/DriveDiscRecommendedAgentsSection';
 import { getDriveDiscDetailBySlug } from '@/services/catalogService';
+import { useAppStore } from '@/store/appStore';
 import type { DriveDiscDetailData } from '@shared/schemas/catalog';
 
 export function DriveDiscDetailView() {
   const { slug = '' } = useParams();
   const [detail, setDetail] = useState<DriveDiscDetailData | null>(null);
+  const setActiveSection = useAppStore((state) => state.setActiveSection);
+
+  useEffect(() => {
+    setActiveSection('drive-discs');
+  }, [setActiveSection]);
 
   useEffect(() => {
     void getDriveDiscDetailBySlug(slug).then(setDetail);
@@ -39,6 +46,12 @@ export function DriveDiscDetailView() {
         title={detail.drive_disc.name}
         subtitle="驱动盘详情页当前先强调套装效果和推荐角色，保持资料站的分区阅读方式。后续可以继续加入主词条、副词条与场景对比。"
         tags={detail.drive_disc.fit_scenes}
+        extra={
+          <FavoriteToggleButton
+            targetType="drive_disc"
+            targetId={detail.drive_disc.id}
+          />
+        }
       />
 
       <Row gutter={[16, 16]}>

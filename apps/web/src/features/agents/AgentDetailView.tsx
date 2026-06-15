@@ -1,17 +1,24 @@
 import { Alert, Button, Col, Row } from 'antd';
 import { Link, useParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { FavoriteToggleButton } from '@/components/FavoriteToggleButton';
 import { PageHeader } from '@/components/PageHeader';
 import { AgentBasicInfoSection } from '@/features/agents/components/AgentBasicInfoSection';
 import { AgentRecommendationListSection } from '@/features/agents/components/AgentRecommendationListSection';
 import { AgentSkillSection } from '@/features/agents/components/AgentSkillSection';
 import { AgentUpdatedSection } from '@/features/agents/components/AgentUpdatedSection';
 import { getAgentDetailBySlug } from '@/services/catalogService';
+import { useAppStore } from '@/store/appStore';
 import type { AgentDetailData } from '@shared/schemas/catalog';
 
 export function AgentDetailView() {
   const { slug = '' } = useParams();
   const [detail, setDetail] = useState<AgentDetailData | null>(null);
+  const setActiveSection = useAppStore((state) => state.setActiveSection);
+
+  useEffect(() => {
+    setActiveSection('agents');
+  }, [setActiveSection]);
 
   useEffect(() => {
     void getAgentDetailBySlug(slug).then(setDetail);
@@ -42,6 +49,7 @@ export function AgentDetailView() {
         title={agent.name}
         subtitle="详情页按攻略信息区块拆分：基础资料用于建立角色画像，技能简介用于快速理解定位，推荐音擎、驱动盘和配队建议则直接服务实战搭配。"
         tags={[agent.element, agent.role, agent.faction]}
+        extra={<FavoriteToggleButton targetType="agent" targetId={agent.id} />}
       />
 
       <Row gutter={[16, 16]}>

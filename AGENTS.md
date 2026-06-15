@@ -1,5 +1,168 @@
 # AGENTS.md
 
+## OpenSpec Workflow
+
+This project uses OpenSpec for spec-driven development.
+
+OpenSpec files live in:
+
+```text
+openspec/
+├── specs/        # Approved specifications / source of truth
+├── changes/      # Proposed or in-progress changes
+└── config.yaml
+```
+
+## Core Rule
+
+Do not implement non-trivial features, refactors, migrations, or behavior changes directly.
+
+Before changing code, first check whether an OpenSpec change is required.
+
+A change is required for:
+
+* New features
+* Breaking changes
+* Architecture changes
+* Data model changes
+* API behavior changes
+* UI behavior changes
+* Security or permission changes
+* Large refactors
+* Any ambiguous request that needs design clarification
+
+Small bug fixes, comments, formatting, typo fixes, and clearly scoped maintenance tasks may be implemented directly, but the agent should still check existing specs first.
+
+## Required Development Flow
+
+For any OpenSpec-controlled change, follow this order:
+
+1. Read existing context:
+
+   * `openspec/specs/`
+   * `openspec/changes/`
+   * relevant source files
+   * existing tests
+
+2. Create or update a change under:
+
+```text
+openspec/changes/<change-name>/
+```
+
+3. Before implementation, prepare the planning artifacts:
+
+   * `proposal.md`
+   * `tasks.md`
+   * spec delta files under `specs/`
+   * `design.md` when the change is complex or architectural
+
+4. Wait until the change is clear before editing production code.
+
+5. Implement strictly according to `tasks.md` and the approved spec delta.
+
+6. Update `tasks.md` as tasks are completed.
+
+7. Run validation before finishing:
+
+```bash
+openspec validate --all
+```
+
+Use strict validation when appropriate:
+
+```bash
+openspec validate --all --strict
+```
+
+8. Run the project’s normal checks, such as:
+
+   * tests
+   * typecheck
+   * lint
+   * build
+
+9. When the change is complete and validated, archive it if requested:
+
+```bash
+openspec archive <change-name>
+```
+
+## Codex Instructions
+
+When working in Codex:
+
+* Prefer using OpenSpec commands or skills when available.
+* If OpenSpec skills are available, use them for proposal, apply, and archive workflows.
+* If skills are not available, use the OpenSpec CLI directly.
+* Do not skip the proposal stage for substantial changes.
+* Do not implement extra features outside the approved OpenSpec scope.
+* If the user request is unclear, create a proposal that states assumptions instead of guessing silently.
+* If existing specs conflict with the user request, point out the conflict before implementation.
+
+## Useful Commands
+
+Initialize OpenSpec for Codex:
+
+```bash
+openspec init --tools codex
+```
+
+List active changes and specs:
+
+```bash
+openspec list
+```
+
+View OpenSpec dashboard:
+
+```bash
+openspec view
+```
+
+Validate all specs and changes:
+
+```bash
+openspec validate --all
+```
+
+Archive a completed change:
+
+```bash
+openspec archive <change-name>
+```
+
+Update generated OpenSpec instructions after upgrading OpenSpec:
+
+```bash
+openspec update
+```
+
+## Expected Agent Behavior
+
+The agent should behave like this:
+
+1. Understand the request.
+2. Check existing OpenSpec specs.
+3. Decide whether a new OpenSpec change is needed.
+4. If needed, create the change first.
+5. Review or explain the proposed plan.
+6. Implement only after the plan is clear.
+7. Keep code, tests, and OpenSpec tasks synchronized.
+8. Validate before final response.
+
+## Forbidden Behavior
+
+Do not:
+
+* Start coding a large feature without checking OpenSpec.
+* Ignore existing specs.
+* Modify unrelated files unnecessarily.
+* Expand the scope without user approval.
+* Leave `tasks.md` outdated.
+* Mark a task complete without implementing and checking it.
+* Archive a change before implementation and validation are complete.
+
 ## Purpose
 
 This file is the primary entry point for any Codex agent working in this repository.

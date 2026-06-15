@@ -2,6 +2,10 @@ import path from 'node:path';
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { IPC_CHANNELS } from '../../../../shared/constants/ipc';
 import type { DesktopAppInfo } from '../../../../shared/schemas/desktop';
+import { initializeDatabase } from './db/client';
+import { seedCatalogData } from './db/seed';
+import { catalogBridgeService } from './services/catalogBridgeService';
+import { pythonTaskService } from './services/pythonTaskService';
 
 const DEV_SERVER_URL = 'http://127.0.0.1:5173';
 
@@ -17,7 +21,27 @@ function createAppInfo(): DesktopAppInfo {
 }
 
 function registerIpcHandlers() {
-  ipcMain.handle(IPC_CHANNELS.getAppInfo, () => createAppInfo());
+  ipcMain.handle(IPC_CHANNELS.app.getInfo, () => createAppInfo());
+  ipcMain.handle(IPC_CHANNELS.sync.runTask, (_, request) => pythonTaskService.runTask(request));
+  ipcMain.handle(IPC_CHANNELS.catalog.getOverview, () => catalogBridgeService.getOverview());
+  ipcMain.handle(IPC_CHANNELS.catalog.queryAgents, (_, filters) =>
+    catalogBridgeService.queryAgents(filters),
+  );
+  ipcMain.handle(IPC_CHANNELS.catalog.getAgentDetailBySlug, (_, slug: string) =>
+    catalogBridgeService.getAgentDetailBySlug(slug),
+  );
+  ipcMain.handle(IPC_CHANNELS.catalog.queryWeapons, (_, filters) =>
+    catalogBridgeService.queryWeapons(filters),
+  );
+  ipcMain.handle(IPC_CHANNELS.catalog.getWeaponDetailBySlug, (_, slug: string) =>
+    catalogBridgeService.getWeaponDetailBySlug(slug),
+  );
+  ipcMain.handle(IPC_CHANNELS.catalog.queryDriveDiscs, (_, filters) =>
+    catalogBridgeService.queryDriveDiscs(filters),
+  );
+  ipcMain.handle(IPC_CHANNELS.catalog.getDriveDiscDetailBySlug, (_, slug: string) =>
+    catalogBridgeService.getDriveDiscDetailBySlug(slug),
+  );
 }
 
 async function loadRenderer(window: BrowserWindow) {
@@ -50,6 +74,7 @@ async function createMainWindow() {
       preload: path.join(__dirname, '..', 'preload', 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
+      sandbox: false,
     },
   });
 
@@ -57,6 +82,8 @@ async function createMainWindow() {
 }
 
 app.whenReady().then(async () => {
+  const database = initializeDatabase(app);
+  seedCatalogData(database);
   registerIpcHandlers();
   await createMainWindow();
 

@@ -1,6 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "zzz-wiki-crawler"
 version = "0.1.0"
 description = "Crawler scaffold for Zenless Zone Zero local guide data pipeline."
+readme = "README.md"
 requires-python = ">=3.11"
 dependencies = []
+
+[project.scripts]
+zzz-crawler = "src.cli:main"
+
+[tool.setuptools]
+packages = [
+  "src",
+  "src.adapters",
+  "src.cleaners",
+  "src.exporters",
+  "src.models",
+  "src.tasks",
+  "src.utils",
+]
