@@ -2,21 +2,35 @@ import { useEffect, useState } from 'react';
 import {
   Alert,
   Button,
+  Card,
   Descriptions,
   Empty,
+  message,
   Space,
+  Steps,
   Table,
   Tag,
   Typography,
 } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import { FeedbackRetryButton, FeedbackStatePanel } from '@/components/FeedbackStatePanel';
+import { FeedbackSkeleton } from '@/components/FeedbackSkeleton';
 import { PageHeader } from '@/components/PageHeader';
 import { SectionCard } from '@/components/SectionCard';
 import { getDesktopAppInfo } from '@/services/desktopBridgeService';
 import {
+  type AsyncStatus,
+  createBridgeUnavailableError,
+  createReadError,
+  createSyncFailureError,
+  normalizeError,
+  type UserFacingError,
+} from '@/lib/feedback';
+import {
   getRecentSyncLogs,
   getSyncOverview,
   runBootstrapAgentsSync,
+  runRealAgentsSync,
 } from '@/services/syncService';
 import { useAppStore } from '@/store/appStore';
 import type {
@@ -27,6 +41,7 @@ import type {
 } from '@shared/schemas/desktop';
 
 const { Paragraph, Text } = Typography;
+type SyncStage = 'idle' | 'preparing' | 'running' | 'success' | 'failed';
 
 function statusTagColor(status: string) {
   if (status === 'success') {
@@ -40,19 +55,97 @@ function statusTagColor(status: string) {
   return 'default';
 }
 
+function statusLabel(status: string) {
+  if (status === 'success') {
+    return '成功';
+  }
+
+  if (status === 'failed') {
+    return '失败';
+  }
+
+  if (status === 'running') {
+    return '运行中';
+  }
+
+  return '待命';
+}
+
+function toSyncStage(
+  syncRunning: boolean,
+  syncResult: RunSyncTaskResult | null,
+  latestStatus: string | null,
+): SyncStage {
+  if (syncRunning && !syncResult) {
+    return 'running';
+  }
+
+  if (syncResult?.ok) {
+    return 'success';
+  }
+
+  if (syncResult && !syncResult.ok) {
+    return 'failed';
+  }
+
+  if (latestStatus === 'success') {
+    return 'success';
+  }
+
+  if (latestStatus === 'failed') {
+    return 'failed';
+  }
+
+  return 'idle';
+}
+
+function stageIndex(stage: SyncStage): number {
+  if (stage === 'idle') {
+    return 0;
+  }
+
+  if (stage === 'preparing') {
+    return 1;
+  }
+
+  if (stage === 'running') {
+    return 2;
+  }
+
+  return 3;
+}
+
+function stageStatus(stage: SyncStage): 'wait' | 'process' | 'finish' | 'error' {
+  if (stage === 'failed') {
+    return 'error';
+  }
+
+  if (stage === 'idle') {
+    return 'wait';
+  }
+
+  if (stage === 'preparing' || stage === 'running') {
+    return 'process';
+  }
+
+  return 'finish';
+}
+
 const columns: ColumnsType<SyncLogSummary> = [
   {
     title: '任务',
     dataIndex: 'taskName',
     key: 'taskName',
     width: 160,
+    render: (taskName: string) =>
+      taskName === 'fetch_mhy_agents' ? '真实角色样本' : taskName === 'bootstrap_agents' ? '本地样例' : taskName,
   },
   {
     title: '状态',
     dataIndex: 'status',
     key: 'status',
     width: 100,
-    render: (status: string) => <Tag color={statusTagColor(status)}>{status}</Tag>,
+    render: (status: string) => <Tag color={statusTagColor(status)}>{statusLabel(status)}</Tag>,
   },
   {
     title: '目标',
@@ -93,23 +186,36 @@ export function SyncCenterPage() {
   const [appInfo, setAppInfo] = useState<DesktopAppInfo | null>(null);
   const [overview, setOverview] = useState<SyncOverview | null>(null);
   const [logs, setLogs] = useState<SyncLogSummary[]>([]);
+  const [pageStatus, setPageStatus] = useState<AsyncStatus>('loading');
+  const [pageError, setPageError] = useState<UserFacingError | null>(null);
+  const [activeSyncTask, setActiveSyncTask] = useState<'bootstrap_agents' | 'fetch_mhy_agents'>('fetch_mhy_agents');
   const [syncRunning, setSyncRunning] = useState(false);
   const [syncResult, setSyncResult] = useState<RunSyncTaskResult | null>(null);
+  const [syncStage, setSyncStage] = useState<SyncStage>('idle');
 
   useEffect(() => {
     setActiveSection('sync-center');
   }, [setActiveSection]);
 
   async function loadSyncData() {
-    const [nextAppInfo, nextOverview, nextLogs] = await Promise.all([
-      getDesktopAppInfo(),
-      getSyncOverview(),
-      getRecentSyncLogs(10),
-    ]);
+    setPageStatus('loading');
+    setPageError(null);
 
-    setAppInfo(nextAppInfo);
-    setOverview(nextOverview);
-    setLogs(nextLogs);
+    try {
+      const [nextAppInfo, nextOverview, nextLogs] = await Promise.all([
+        getDesktopAppInfo(),
+        getSyncOverview(),
+        getRecentSyncLogs(10),
+      ]);
+
+      setAppInfo(nextAppInfo);
+      setOverview(nextOverview);
+      setLogs(nextLogs);
+      setPageStatus('success');
+    } catch (nextError) {
+      setPageError(normalizeError(nextError, createReadError('同步中心')));
+      setPageStatus('error');
+    }
   }
 
   useEffect(() => {
@@ -117,12 +223,24 @@ export function SyncCenterPage() {
   }, []);
 
   async function handleRunSync() {
+    setSyncStage('preparing');
     setSyncRunning(true);
     setSyncResult(null);
 
     try {
-      const result = await runBootstrapAgentsSync();
+      setSyncStage('running');
+      const result =
+        activeSyncTask === 'fetch_mhy_agents'
+          ? await runRealAgentsSync()
+          : await runBootstrapAgentsSync();
       setSyncResult(result);
+      setSyncStage(result.ok ? 'success' : 'failed');
+      if (result.ok) {
+        void message.success(`同步完成，已写入 ${result.recordCount} 条记录。`);
+      } else {
+        const syncError = createSyncFailureError(result);
+        void message.error(syncError.title);
+      }
       await loadSyncData();
     } finally {
       setSyncRunning(false);
@@ -131,6 +249,10 @@ export function SyncCenterPage() {
 
   const latestLog = overview?.latestLog ?? null;
   const bridgeConnected = appInfo?.bridgeStatus === 'connected';
+  const currentStage =
+    syncRunning || syncStage === 'preparing'
+      ? syncStage
+      : toSyncStage(false, syncResult, latestLog?.status ?? null);
 
   return (
     <div className="page">
@@ -146,24 +268,90 @@ export function SyncCenterPage() {
         extra={
           <Space wrap>
             <Button
+              type={activeSyncTask === 'fetch_mhy_agents' ? 'primary' : 'default'}
+              disabled={syncRunning}
+              onClick={() => setActiveSyncTask('fetch_mhy_agents')}
+            >
+              真实角色样本
+            </Button>
+            <Button
+              type={activeSyncTask === 'bootstrap_agents' ? 'primary' : 'default'}
+              disabled={syncRunning}
+              onClick={() => setActiveSyncTask('bootstrap_agents')}
+            >
+              本地样例数据
+            </Button>
+            <Button
               type="primary"
               loading={syncRunning}
               disabled={!bridgeConnected}
               onClick={() => void handleRunSync()}
             >
-              手动同步角色样例
+              {syncRunning
+                ? `正在执行 ${activeSyncTask === 'fetch_mhy_agents' ? '真实角色样本' : '本地样例数据'}`
+                : `执行${activeSyncTask === 'fetch_mhy_agents' ? '真实角色样本' : '本地样例数据'}同步`}
             </Button>
             <Button disabled>失败重试（预留）</Button>
             <Button disabled>增量同步（预留）</Button>
           </Space>
         }
       >
+        {pageStatus === 'loading' ? <FeedbackSkeleton variant="sync" /> : null}
+
+        {pageStatus === 'error' && pageError ? (
+          <FeedbackStatePanel
+            tone="error"
+            title={pageError.title}
+            description={pageError.description}
+            action={<FeedbackRetryButton onClick={() => void loadSyncData()} />}
+          />
+        ) : null}
+
+        {pageStatus === 'success' ? (
+          <>
+        <div className="sync-summary-grid">
+          <Card bordered={false} className="panel sync-summary-card">
+            <Text className="sync-summary-card__label">当前任务</Text>
+            <Text className="sync-summary-card__value">
+              {activeSyncTask === 'fetch_mhy_agents' ? '真实角色样本同步' : '本地样例同步'}
+            </Text>
+          </Card>
+          <Card bordered={false} className="panel sync-summary-card">
+            <Text className="sync-summary-card__label">最近状态</Text>
+            <Tag color={statusTagColor(latestLog?.status ?? 'idle')} className="sync-summary-card__tag">
+              {statusLabel(latestLog?.status ?? 'idle')}
+            </Tag>
+          </Card>
+          <Card bordered={false} className="panel sync-summary-card">
+            <Text className="sync-summary-card__label">日志数量</Text>
+            <Text className="sync-summary-card__value">{logs.length} 条</Text>
+          </Card>
+        </div>
+
+        <Card bordered={false} className="panel sync-stage-card">
+          <Text className="sync-summary-card__label">执行阶段</Text>
+          <Steps
+            current={stageIndex(currentStage)}
+            status={stageStatus(currentStage)}
+            size="small"
+            items={[
+              { title: '待命', description: '未执行任务' },
+              { title: '准备', description: '准备发起任务' },
+              { title: '执行中', description: '等待 Python / SQLite 完成' },
+              {
+                title: currentStage === 'failed' ? '失败' : '完成',
+                description: currentStage === 'failed' ? '任务执行失败' : '任务已返回结果',
+              },
+            ]}
+          />
+        </Card>
+
         {!bridgeConnected ? (
           <Alert
             type="warning"
             showIcon
-            message="当前不是 Electron 桌面壳环境"
-            description="同步中心需要通过 preload 和主进程访问本地 SQLite 与 Python 任务。请在 Electron 窗口中使用。"
+            message={createBridgeUnavailableError().title}
+            description={createBridgeUnavailableError().description}
           />
         ) : null}
 
@@ -176,17 +364,21 @@ export function SyncCenterPage() {
             description={
               syncResult.ok
                 ? `任务 ${syncResult.taskName} 已完成，写入 ${syncResult.recordCount} 条记录。`
-                : `${syncResult.errorCode}: ${syncResult.errorMessage}`
+                : createSyncFailureError(syncResult).description
             }
           />
         ) : null}
 
         <Descriptions bordered size="small" column={2} style={{ marginTop: 16 }}>
           <Descriptions.Item label="最近任务">
-            {latestLog?.taskName ?? '--'}
+            {latestLog?.taskName === 'fetch_mhy_agents'
+              ? '真实角色样本'
+              : latestLog?.taskName === 'bootstrap_agents'
+                ? '本地样例'
+                : latestLog?.taskName ?? '--'}
           </Descriptions.Item>
           <Descriptions.Item label="最近状态">
-            {latestLog ? <Tag color={statusTagColor(latestLog.status)}>{latestLog.status}</Tag> : '--'}
+            {latestLog ? <Tag color={statusTagColor(latestLog.status)}>{statusLabel(latestLog.status)}</Tag> : '--'}
           </Descriptions.Item>
           <Descriptions.Item label="开始时间">
             {latestLog?.startedAt ?? '--'}
@@ -215,26 +407,63 @@ export function SyncCenterPage() {
               '--'}
           </Text>
         </div>
+          </>
+        ) : null}
       </SectionCard>
 
       <SectionCard
         title="最近日志"
         description="日志字段保持与 SQLite `sync_logs` 兼容，页面按任务、状态、时间和结果摘要展示。"
       >
-        {logs.length ? (
+        {pageStatus === 'loading' ? <FeedbackSkeleton variant="sync" /> : null}
+        {pageStatus === 'success' && logs.length ? (
           <Table<SyncLogSummary>
             rowKey="id"
             columns={columns}
             dataSource={logs}
             pagination={false}
+            expandable={{
+              expandedRowRender: (record) => (
+                <div className="sync-log-details">
+                  <Descriptions bordered size="small" column={2}>
+                    <Descriptions.Item label="来源任务">{record.sourceName ?? '--'}</Descriptions.Item>
+                    <Descriptions.Item label="错误码">{record.errorCode ?? '--'}</Descriptions.Item>
+                    <Descriptions.Item label="输出路径">{record.output ?? '--'}</Descriptions.Item>
+                    <Descriptions.Item label="记录数">{record.recordCount ?? '--'}</Descriptions.Item>
+                    <Descriptions.Item label="退出码">{record.exitCode ?? '--'}</Descriptions.Item>
+                    <Descriptions.Item label="目标">{record.target ?? '--'}</Descriptions.Item>
+                  </Descriptions>
+                  <div className="sync-log-details__streams">
+                    <div className="sync-log-details__stream">
+                      <Text className="sync-summary-card__label">STDOUT</Text>
+                      <pre>{record.stdout?.trim() || '无输出'}</pre>
+                    </div>
+                    <div className="sync-log-details__stream">
+                      <Text className="sync-summary-card__label">STDERR</Text>
+                      <pre>{record.stderr?.trim() || '无输出'}</pre>
+                    </div>
+                  </div>
+                </div>
+              ),
+              rowExpandable: (record) =>
+                Boolean(
+                  record.stdout?.trim() ||
+                    record.stderr?.trim() ||
+                    record.errorCode ||
+                    record.output ||
+                    record.sourceName,
+                ),
+            }}
+            rowClassName={(record) => `sync-log-row sync-log-row--${record.status}`}
             scroll={{ x: 1100 }}
           />
-        ) : (
+        ) : null}
+        {pageStatus === 'success' && !logs.length ? (
           <Empty
             image={Empty.PRESENTED_IMAGE_SIMPLE}
             description="暂时没有同步日志，先执行一次手动同步。"
           />
-        )}
+        ) : null}
       </SectionCard>
 
       <SectionCard

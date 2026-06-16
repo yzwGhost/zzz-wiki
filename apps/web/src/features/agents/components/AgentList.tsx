@@ -1,14 +1,16 @@
+import type { ReactNode } from 'react';
 import { Empty, List } from 'antd';
 import type { Agent } from '@shared/schemas/catalog';
 import { AgentCard } from '@/features/agents/components/AgentCard';
 
 interface AgentListProps {
   agents: Agent[];
+  emptyContent?: ReactNode;
 }
 
-export function AgentList({ agents }: AgentListProps) {
+export function AgentList({ agents, emptyContent }: AgentListProps) {
   if (!agents.length) {
-    return <Empty description="没有匹配的代理人条目" />;
+    return emptyContent ?? <Empty description="没有匹配的代理人条目" />;
   }
 
   return (

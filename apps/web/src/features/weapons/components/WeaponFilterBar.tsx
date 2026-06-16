@@ -18,6 +18,7 @@ const optionLabelMap: Record<AgentRole | Rarity, string> = {
   Stun: '击破',
   Support: '支援',
   Defense: '防护',
+  Rupture: '命破',
   S: 'S 级',
   A: 'A 级',
 };

@@ -1,12 +1,15 @@
-import { Alert, Button, Col, Row } from 'antd';
+import { Button, Col, Row } from 'antd';
 import { Link, useParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
+import { FeedbackRetryButton, FeedbackStatePanel } from '@/components/FeedbackStatePanel';
+import { FeedbackSkeleton } from '@/components/FeedbackSkeleton';
 import { FavoriteToggleButton } from '@/components/FavoriteToggleButton';
 import { PageHeader } from '@/components/PageHeader';
 import { AgentBasicInfoSection } from '@/features/agents/components/AgentBasicInfoSection';
 import { AgentRecommendationListSection } from '@/features/agents/components/AgentRecommendationListSection';
 import { AgentSkillSection } from '@/features/agents/components/AgentSkillSection';
 import { AgentUpdatedSection } from '@/features/agents/components/AgentUpdatedSection';
+import { type AsyncStatus, createReadError, normalizeError, type UserFacingError } from '@/lib/feedback';
 import { getAgentDetailBySlug } from '@/services/catalogService';
 import { useAppStore } from '@/store/appStore';
 import type { AgentDetailData } from '@shared/schemas/catalog';
@@ -14,25 +17,67 @@ import type { AgentDetailData } from '@shared/schemas/catalog';
 export function AgentDetailView() {
   const { slug = '' } = useParams();
   const [detail, setDetail] = useState<AgentDetailData | null>(null);
+  const [status, setStatus] = useState<AsyncStatus>('loading');
+  const [error, setError] = useState<UserFacingError | null>(null);
   const setActiveSection = useAppStore((state) => state.setActiveSection);
 
   useEffect(() => {
     setActiveSection('agents');
   }, [setActiveSection]);
 
+  async function loadDetail() {
+    setStatus('loading');
+    setError(null);
+
+    try {
+      const nextDetail = await getAgentDetailBySlug(slug);
+      setDetail(nextDetail);
+      setStatus('success');
+    } catch (nextError) {
+      setError(normalizeError(nextError, createReadError('代理人详情')));
+      setStatus('error');
+    }
+  }
+
   useEffect(() => {
-    void getAgentDetailBySlug(slug).then(setDetail);
+    void loadDetail();
   }, [slug]);
+
+  if (status === 'loading') {
+    return (
+      <div className="page">
+        <PageHeader
+          title="代理人详情"
+          subtitle="正在加载角色基础资料、技能简介和推荐搭配。"
+          tags={['详情加载中']}
+        />
+        <FeedbackSkeleton variant="detail" />
+      </div>
+    );
+  }
+
+  if (status === 'error' && error) {
+    return (
+      <div className="page">
+        <FeedbackStatePanel
+          tone="error"
+          title={error.title}
+          description={error.description}
+          action={<FeedbackRetryButton onClick={() => void loadDetail()} />}
+        />
+      </div>
+    );
+  }
 
   if (!detail) {
     return (
       <div className="page">
-        <Alert
-          type="warning"
-          showIcon
-          message="未找到对应代理人"
-          description={
-            <Button type="link">
+        <FeedbackStatePanel
+          tone="warning"
+          title="未找到对应代理人"
+          description="当前 slug 没有匹配到详情数据，请返回代理人图鉴重新选择。"
+          action={
+            <Button type="primary">
               <Link to="/agents">返回代理人图鉴</Link>
             </Button>
           }

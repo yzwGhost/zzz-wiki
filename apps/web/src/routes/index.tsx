@@ -5,6 +5,7 @@ import { AgentsPage } from '@/pages/AgentsPage';
 import { DriveDiscDetailPage } from '@/pages/DriveDiscDetailPage';
 import { DriveDiscsPage } from '@/pages/DriveDiscsPage';
 import { HomePage } from '@/pages/HomePage';
+import { RouteErrorPage } from '@/pages/RouteErrorPage';
 import { SyncCenterPage } from '@/pages/SyncCenterPage';
 import { WeaponDetailPage } from '@/pages/WeaponDetailPage';
 import { WeaponsPage } from '@/pages/WeaponsPage';
@@ -13,6 +14,7 @@ export const router = createHashRouter([
   {
     path: '/',
     element: <AppShell />,
+    errorElement: <RouteErrorPage />,
     children: [
       {
         index: true,

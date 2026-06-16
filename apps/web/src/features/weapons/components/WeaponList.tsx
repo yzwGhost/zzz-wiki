@@ -1,14 +1,16 @@
+import type { ReactNode } from 'react';
 import { Empty, List } from 'antd';
 import type { Weapon } from '@shared/schemas/catalog';
 import { WeaponCard } from '@/features/weapons/components/WeaponCard';
 
 interface WeaponListProps {
   weapons: Weapon[];
+  emptyContent?: ReactNode;
 }
 
-export function WeaponList({ weapons }: WeaponListProps) {
+export function WeaponList({ weapons, emptyContent }: WeaponListProps) {
   if (!weapons.length) {
-    return <Empty description="暂无音擎资料" />;
+    return emptyContent ?? <Empty description="暂无音擎资料" />;
   }
 
   return (

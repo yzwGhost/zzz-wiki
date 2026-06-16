@@ -7,12 +7,17 @@ import sys
 from src.exporters.json_exporter import JsonExporter
 from src.exporters.sqlite_exporter import SqliteExporter
 from src.tasks.bootstrap_agents import TASK_NAME, run_bootstrap_agents_task
+from src.tasks.fetch_mhy_agents import (
+    TASK_NAME as FETCH_MHY_AGENTS_TASK_NAME,
+    run_fetch_mhy_agents_task,
+)
 from src.utils.errors import CrawlerError, UnsupportedExportTargetError
 from src.utils.logging import configure_logging, get_logger
 
 
 TASK_REGISTRY = {
     TASK_NAME: run_bootstrap_agents_task,
+    FETCH_MHY_AGENTS_TASK_NAME: run_fetch_mhy_agents_task,
 }
 
 EXPORTERS = {

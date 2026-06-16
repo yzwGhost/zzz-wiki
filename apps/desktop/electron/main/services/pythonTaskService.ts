@@ -11,7 +11,7 @@ import { syncLogRepository } from '../repositories/syncLogRepository';
 
 const execFileAsync = promisify(execFile);
 
-const ALLOWED_TASKS = new Set<SyncTaskName>(['bootstrap_agents']);
+const ALLOWED_TASKS = new Set<SyncTaskName>(['bootstrap_agents', 'fetch_mhy_agents']);
 const ALLOWED_TARGETS = new Set<SyncTaskTarget>(['json', 'sqlite']);
 
 interface PythonCommandCandidate {

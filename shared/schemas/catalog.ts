@@ -5,14 +5,16 @@ export type AgentElement =
   | 'Electric'
   | 'Fire'
   | 'Ice'
-  | 'Physical';
+  | 'Physical'
+  | 'Wind';
 
 export type AgentRole =
   | 'Attack'
   | 'Anomaly'
   | 'Stun'
   | 'Support'
-  | 'Defense';
+  | 'Defense'
+  | 'Rupture';
 
 export interface Agent {
   id: string;

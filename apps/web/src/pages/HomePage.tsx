@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  Alert,
   Button,
   Card,
   Col,
@@ -11,18 +12,43 @@ import {
   Typography,
 } from 'antd';
 import { Link } from 'react-router-dom';
+import { FeedbackRetryButton, FeedbackStatePanel } from '@/components/FeedbackStatePanel';
+import { FeedbackSkeleton } from '@/components/FeedbackSkeleton';
 import { PageHeader } from '@/components/PageHeader';
 import { SectionCard } from '@/components/SectionCard';
+import { type AsyncStatus, createReadError, normalizeError, type UserFacingError } from '@/lib/feedback';
 import { getCatalogOverview } from '@/services/catalogService';
+import { useAppStore } from '@/store/appStore';
 import type { CatalogOverview } from '@shared/schemas/catalog';
 
 const { Paragraph, Text, Title } = Typography;
 
 export function HomePage() {
   const [overview, setOverview] = useState<CatalogOverview | null>(null);
+  const [status, setStatus] = useState<AsyncStatus>('loading');
+  const [error, setError] = useState<UserFacingError | null>(null);
+  const setActiveSection = useAppStore((state) => state.setActiveSection);
 
   useEffect(() => {
-    void getCatalogOverview().then(setOverview);
+    setActiveSection('home');
+  }, [setActiveSection]);
+
+  async function loadOverview() {
+    setStatus('loading');
+    setError(null);
+
+    try {
+      const nextOverview = await getCatalogOverview();
+      setOverview(nextOverview);
+      setStatus('success');
+    } catch (nextError) {
+      setError(normalizeError(nextError, createReadError('首页概览')));
+      setStatus('error');
+    }
+  }
+
+  useEffect(() => {
+    void loadOverview();
   }, []);
 
   return (
@@ -86,26 +112,41 @@ export function HomePage() {
               </Text>
             }
           >
-            <Row gutter={[12, 12]}>
-              <Col xs={12} md={8} xl={4}>
-                <Statistic title="代理人" value={overview?.counts.agents ?? 0} />
-              </Col>
-              <Col xs={12} md={8} xl={4}>
-                <Statistic title="音擎" value={overview?.counts.weapons ?? 0} />
-              </Col>
-              <Col xs={12} md={8} xl={4}>
-                <Statistic title="驱动盘" value={overview?.counts.drive_discs ?? 0} />
-              </Col>
-              <Col xs={12} md={8} xl={4}>
-                <Statistic title="配队" value={overview?.counts.teams ?? 0} />
-              </Col>
-              <Col xs={12} md={8} xl={4}>
-                <Statistic title="材料" value={overview?.counts.materials ?? 0} />
-              </Col>
-              <Col xs={12} md={8} xl={4}>
-                <Statistic title="版本" value={overview?.current_version ?? '--'} />
-              </Col>
-            </Row>
+            {status === 'loading' ? (
+              <FeedbackSkeleton variant="dashboard" />
+            ) : null}
+
+            {status === 'error' && error ? (
+              <FeedbackStatePanel
+                tone="error"
+                title={error.title}
+                description={error.description}
+                action={<FeedbackRetryButton onClick={() => void loadOverview()} />}
+              />
+            ) : null}
+
+            {status === 'success' && overview ? (
+              <Row gutter={[12, 12]}>
+                <Col xs={12} md={8} xl={4}>
+                  <Statistic title="代理人" value={overview.counts.agents} />
+                </Col>
+                <Col xs={12} md={8} xl={4}>
+                  <Statistic title="音擎" value={overview.counts.weapons} />
+                </Col>
+                <Col xs={12} md={8} xl={4}>
+                  <Statistic title="驱动盘" value={overview.counts.drive_discs} />
+                </Col>
+                <Col xs={12} md={8} xl={4}>
+                  <Statistic title="配队" value={overview.counts.teams} />
+                </Col>
+                <Col xs={12} md={8} xl={4}>
+                  <Statistic title="材料" value={overview.counts.materials} />
+                </Col>
+                <Col xs={12} md={8} xl={4}>
+                  <Statistic title="版本" value={overview.current_version} />
+                </Col>
+              </Row>
+            ) : null}
           </SectionCard>
 
           <SectionCard
@@ -131,16 +172,19 @@ export function HomePage() {
             title="更新日志精选"
             extra={<Link to="/agents">全部 →</Link>}
           >
-            <div className="update-grid">
-              {overview?.featured_agents.map((agent) => (
-                <Card key={agent.id} className="update-tile" bordered={false}>
-                  <Text className="update-tile__label">{agent.role}</Text>
-                  <Title level={5}>{agent.name}</Title>
-                  <Paragraph>{agent.summary}</Paragraph>
-                  <Text type="secondary">最近更新：{agent.updated_at}</Text>
-                </Card>
-              ))}
-            </div>
+            {status === 'loading' ? <FeedbackSkeleton variant="catalog-grid" cards={3} /> : null}
+            {status === 'success' && overview ? (
+              <div className="update-grid">
+                {overview.featured_agents.map((agent) => (
+                  <Card key={agent.id} className="update-tile" bordered={false}>
+                    <Text className="update-tile__label">{agent.role}</Text>
+                    <Title level={5}>{agent.name}</Title>
+                    <Paragraph>{agent.summary}</Paragraph>
+                    <Text type="secondary">最近更新：{agent.updated_at}</Text>
+                  </Card>
+                ))}
+              </div>
+            ) : null}
           </SectionCard>
         </div>
 
@@ -155,33 +199,47 @@ export function HomePage() {
           </SectionCard>
 
           <SectionCard title="更新日志" extra={<Link to="/agents">全部</Link>}>
-            <List
-              size="small"
-              dataSource={overview?.featured_agents ?? []}
-              renderItem={(agent) => (
-                <List.Item className="rail-list__item">
-                  <Space direction="vertical" size={2}>
-                    <Text strong>{agent.name}</Text>
-                    <Text type="secondary">{agent.summary}</Text>
-                  </Space>
-                </List.Item>
-              )}
-            />
+            {status === 'error' && error ? (
+              <Alert
+                type="error"
+                showIcon
+                message={error.title}
+                description={error.description}
+              />
+            ) : null}
+            {status === 'loading' ? <FeedbackSkeleton variant="sync" /> : null}
+            {status === 'success' && overview ? (
+              <List
+                size="small"
+                dataSource={overview.featured_agents}
+                renderItem={(agent) => (
+                  <List.Item className="rail-list__item">
+                    <Space direction="vertical" size={2}>
+                      <Text strong>{agent.name}</Text>
+                      <Text type="secondary">{agent.summary}</Text>
+                    </Space>
+                  </List.Item>
+                )}
+              />
+            ) : null}
           </SectionCard>
 
           <SectionCard title="热门活动">
             <Button type="primary" block className="rail-action">
               活动日历
             </Button>
-            <List
-              size="small"
-              dataSource={overview?.featured_weapons ?? []}
-              renderItem={(weapon) => (
-                <List.Item className="rail-list__item">
-                  <Text>{weapon.name}</Text>
-                </List.Item>
-              )}
-            />
+            {status === 'loading' ? <FeedbackSkeleton variant="sync" /> : null}
+            {status === 'success' && overview ? (
+              <List
+                size="small"
+                dataSource={overview.featured_weapons}
+                renderItem={(weapon) => (
+                  <List.Item className="rail-list__item">
+                    <Text>{weapon.name}</Text>
+                  </List.Item>
+                )}
+              />
+            ) : null}
           </SectionCard>
         </aside>
       </div>

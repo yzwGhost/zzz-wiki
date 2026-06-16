@@ -1,14 +1,16 @@
+import type { ReactNode } from 'react';
 import { Empty, List } from 'antd';
 import type { DriveDisc } from '@shared/schemas/catalog';
 import { DriveDiscCard } from '@/features/drive-discs/components/DriveDiscCard';
 
 interface DriveDiscListProps {
   driveDiscs: DriveDisc[];
+  emptyContent?: ReactNode;
 }
 
-export function DriveDiscList({ driveDiscs }: DriveDiscListProps) {
+export function DriveDiscList({ driveDiscs, emptyContent }: DriveDiscListProps) {
   if (!driveDiscs.length) {
-    return <Empty description="暂无驱动盘资料" />;
+    return emptyContent ?? <Empty description="暂无驱动盘资料" />;
   }
 
   return (

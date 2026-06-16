@@ -6,6 +6,7 @@ export const agentElementOptions: AgentElement[] = [
   'Fire',
   'Ice',
   'Physical',
+  'Wind',
 ];
 
 export const agentRoleOptions: AgentRole[] = [
@@ -14,6 +15,7 @@ export const agentRoleOptions: AgentRole[] = [
   'Stun',
   'Support',
   'Defense',
+  'Rupture',
 ];
 
 export const agentRarityOptions: Rarity[] = ['S', 'A'];

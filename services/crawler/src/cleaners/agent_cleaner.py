@@ -30,7 +30,7 @@ def clean_agent_record(raw_record: RawAgentRecord) -> AgentRecord:
         )
 
     slug = str(raw_record["slug"]).strip()
-    updated_at = datetime.now(UTC).date().isoformat()
+    updated_at = str(raw_record.get("updated_at") or datetime.now(UTC).date().isoformat())
 
     return AgentRecord(
         id=f"agent-{slug}",
@@ -53,6 +53,6 @@ def clean_agent_record(raw_record: RawAgentRecord) -> AgentRecord:
         skill_intro=str(raw_record["skill_intro"]).strip(),
         game_version=str(raw_record["game_version"]).strip(),
         released_at=str(raw_record["released_at"]).strip(),
-        updated_at=updated_at,
+        updated_at=updated_at.strip(),
         source_url=str(raw_record["source_url"]).strip(),
     )

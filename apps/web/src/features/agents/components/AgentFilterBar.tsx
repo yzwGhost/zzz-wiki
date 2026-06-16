@@ -19,11 +19,13 @@ const optionLabelMap: Record<AgentElement | AgentRole | Rarity, string> = {
   Fire: '火',
   Ice: '冰',
   Physical: '物理',
+  Wind: '风',
   Attack: '强攻',
   Anomaly: '异常',
   Stun: '击破',
   Support: '支援',
   Defense: '防护',
+  Rupture: '命破',
   S: 'S 级',
   A: 'A 级',
 };

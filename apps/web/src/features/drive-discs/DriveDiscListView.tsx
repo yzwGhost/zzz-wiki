@@ -1,9 +1,20 @@
 import { useEffect, useState } from 'react';
-import { Typography } from 'antd';
+import { Button, Typography } from 'antd';
+import { FeedbackRetryButton, FeedbackStatePanel } from '@/components/FeedbackStatePanel';
+import { FeedbackSkeleton } from '@/components/FeedbackSkeleton';
 import { PageHeader } from '@/components/PageHeader';
+import { ResultSummaryBar } from '@/components/ResultSummaryBar';
 import { SectionCard } from '@/components/SectionCard';
 import { DriveDiscFilterBar } from '@/features/drive-discs/components/DriveDiscFilterBar';
 import { DriveDiscList } from '@/features/drive-discs/components/DriveDiscList';
+import {
+  type AsyncStatus,
+  createReadError,
+  hasDriveDiscFiltersApplied,
+  normalizeError,
+  summarizeDriveDiscFilters,
+  type UserFacingError,
+} from '@/lib/feedback';
 import { queryDriveDiscs } from '@/services/catalogService';
 import { useAppStore } from '@/store/appStore';
 import { createFavoriteKey, useFavoriteStore } from '@/store/favoriteStore';
@@ -15,8 +26,11 @@ const { Text } = Typography;
 export function DriveDiscListView() {
   const [driveDiscs, setDriveDiscs] = useState<DriveDisc[]>([]);
   const [sceneOptions, setSceneOptions] = useState<string[]>([]);
+  const [status, setStatus] = useState<AsyncStatus>('loading');
+  const [error, setError] = useState<UserFacingError | null>(null);
   const filters = useFilterStore((state) => state.driveDiscFilters);
   const setDriveDiscFilters = useFilterStore((state) => state.setDriveDiscFilters);
+  const resetDriveDiscFilters = useFilterStore((state) => state.resetDriveDiscFilters);
   const favorites = useFavoriteStore((state) => state.favorites);
   const setActiveSection = useAppStore((state) => state.setActiveSection);
 
@@ -25,26 +39,34 @@ export function DriveDiscListView() {
   }, [setActiveSection]);
 
   useEffect(() => {
-    void queryDriveDiscs().then((allDriveDiscs) => {
-      setSceneOptions(
-        Array.from(new Set(allDriveDiscs.flatMap((driveDisc) => driveDisc.fit_scenes))),
-      );
-    });
-  }, []);
+    async function loadDriveDiscs() {
+      setStatus('loading');
+      setError(null);
 
-  useEffect(() => {
-    void queryDriveDiscs(filters).then((nextDriveDiscs) => {
-      if (!filters.favorite_only) {
-        setDriveDiscs(nextDriveDiscs);
-        return;
+      try {
+        const [allDriveDiscs, nextDriveDiscs] = await Promise.all([
+          queryDriveDiscs(),
+          queryDriveDiscs(filters),
+        ]);
+
+        setSceneOptions(
+          Array.from(new Set(allDriveDiscs.flatMap((driveDisc) => driveDisc.fit_scenes))),
+        );
+        setDriveDiscs(
+          !filters.favorite_only
+            ? nextDriveDiscs
+            : nextDriveDiscs.filter((driveDisc) =>
+                Boolean(favorites[createFavoriteKey('drive_disc', driveDisc.id)]),
+              ),
+        );
+        setStatus('success');
+      } catch (nextError) {
+        setError(normalizeError(nextError, createReadError('驱动盘列表')));
+        setStatus('error');
       }
+    }
 
-      setDriveDiscs(
-        nextDriveDiscs.filter((driveDisc) =>
-          Boolean(favorites[createFavoriteKey('drive_disc', driveDisc.id)]),
-        ),
-      );
-    });
+    void loadDriveDiscs();
   }, [favorites, filters]);
 
   return (
@@ -71,7 +93,37 @@ export function DriveDiscListView() {
         description="当前列表展示场景标签、2 件套和 4 件套效果摘要，后续可继续补角色筛选与词条建议。"
         extra={<Text>{driveDiscs.length} 套</Text>}
       >
-        <DriveDiscList driveDiscs={driveDiscs} />
+        {status === 'loading' ? <FeedbackSkeleton variant="catalog-grid" /> : null}
+        {status === 'error' && error ? (
+          <FeedbackStatePanel
+            tone="error"
+            title={error.title}
+            description={error.description}
+            action={<FeedbackRetryButton onClick={() => setDriveDiscFilters({ ...filters })} />}
+          />
+        ) : null}
+        {status === 'success' ? (
+          <>
+            <ResultSummaryBar
+              count={driveDiscs.length}
+              label="套驱动盘"
+              tags={summarizeDriveDiscFilters(filters)}
+              onClear={hasDriveDiscFiltersApplied(filters) ? () => resetDriveDiscFilters() : undefined}
+            />
+            <DriveDiscList
+              driveDiscs={driveDiscs}
+              emptyContent={
+                hasDriveDiscFiltersApplied(filters) ? (
+                  <FeedbackStatePanel
+                    title="没有匹配的驱动盘"
+                    description="当前筛选条件下没有结果，可以清空关键字或场景筛选后重试。"
+                    action={<Button onClick={() => resetDriveDiscFilters()}>清空筛选</Button>}
+                  />
+                ) : undefined
+              }
+            />
+          </>
+        ) : null}
       </SectionCard>
     </div>
   );

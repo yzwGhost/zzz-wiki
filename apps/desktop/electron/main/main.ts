@@ -73,7 +73,14 @@ async function createMainWindow() {
     height: 840,
     minWidth: 1080,
     minHeight: 720,
-    backgroundColor: '#0f172a',
+    autoHideMenuBar: true,
+    backgroundColor: '#070707',
+    titleBarStyle: 'hidden',
+    titleBarOverlay: {
+      color: '#0a0a0a',
+      symbolColor: '#f5f5f5',
+      height: 40,
+    },
     webPreferences: {
       preload: path.join(__dirname, '..', 'preload', 'preload.js'),
       contextIsolation: true,
@@ -81,6 +88,8 @@ async function createMainWindow() {
       sandbox: false,
     },
   });
+
+  mainWindow.removeMenu();
 
   await loadRenderer(mainWindow);
 }

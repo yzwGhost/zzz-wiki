@@ -1,5 +1,6 @@
 import { Button } from 'antd';
 import type { FavoriteTargetType } from '@shared/schemas/catalog';
+import { announceFavoriteToggle } from '@/lib/notifications';
 import { createFavoriteKey, useFavoriteStore } from '@/store/favoriteStore';
 
 interface FavoriteToggleButtonProps {
@@ -20,14 +21,19 @@ export function FavoriteToggleButton({
   return (
     <Button
       type={isFavorite ? 'primary' : 'default'}
-      className={className}
+      className={`${className ?? ''} favorite-toggle ${isFavorite ? 'favorite-toggle--active' : ''}`.trim()}
+      aria-pressed={isFavorite}
       onClick={(event) => {
         event.preventDefault();
         event.stopPropagation();
         toggleFavorite(targetType, targetId);
+        announceFavoriteToggle(!isFavorite);
       }}
     >
-      {isFavorite ? '已收藏' : '收藏'}
+      <span className="favorite-toggle__icon" aria-hidden="true">
+        {isFavorite ? '★' : '☆'}
+      </span>
+      <span>{isFavorite ? '已收藏' : '收藏'}</span>
     </Button>
   );
 }

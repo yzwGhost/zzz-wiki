@@ -23,6 +23,10 @@ interface SyncPayloadShape {
   output?: string;
   record_count?: number;
   errorCode?: string;
+  stdout?: string;
+  stderr?: string;
+  exitCode?: number;
+  source_name?: string;
 }
 
 function parsePayload(payloadJson: string): SyncPayloadShape {
@@ -47,6 +51,10 @@ function mapRowToSummary(row: SyncLogRow): SyncLogSummary {
     output: payload.output ?? null,
     recordCount: typeof payload.record_count === 'number' ? payload.record_count : null,
     errorCode: payload.errorCode ?? null,
+    stdout: payload.stdout ?? null,
+    stderr: payload.stderr ?? null,
+    exitCode: typeof payload.exitCode === 'number' ? payload.exitCode : null,
+    sourceName: payload.source_name ?? null,
   };
 }
 
@@ -72,6 +80,11 @@ export const syncLogRepository = {
         {
           taskName: 'bootstrap_agents',
           label: '角色样例同步',
+          targets: ['sqlite', 'json'],
+        },
+        {
+          taskName: 'fetch_mhy_agents',
+          label: '米哈游角色样本同步',
           targets: ['sqlite', 'json'],
         },
       ],

@@ -1,9 +1,50 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import type Database from 'better-sqlite3';
 import { mockCatalogData } from '../../../../../shared/mock-data/catalog';
+import type { Agent } from '../../../../../shared/schemas/catalog';
 import { CATALOG_SQL } from './catalogSql';
 
 function toJson(value: unknown): string {
   return JSON.stringify(value);
+}
+
+type ProcessedAgentPayload = {
+  records?: Agent[];
+};
+
+function resolveRealAgentSnapshotPath(): string | null {
+  const candidates = [
+    path.resolve(process.cwd(), 'services/crawler/data/processed/fetch_mhy_agents.json'),
+    path.resolve(process.cwd(), '../../services/crawler/data/processed/fetch_mhy_agents.json'),
+    path.resolve(__dirname, '../../../../../../../../services/crawler/data/processed/fetch_mhy_agents.json'),
+  ];
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function getRealAgentSeedRecords(): Agent[] {
+  const processedPath = resolveRealAgentSnapshotPath();
+
+  if (!processedPath) {
+    return [];
+  }
+
+  try {
+    const content = fs.readFileSync(processedPath, 'utf-8');
+    const payload = JSON.parse(content) as ProcessedAgentPayload;
+
+    return Array.isArray(payload.records) ? payload.records : [];
+  } catch (error) {
+    console.warn('[seed] Failed to load processed real agent snapshot:', error);
+    return [];
+  }
 }
 
 export function seedCatalogData(database: Database.Database): void {
@@ -18,9 +59,11 @@ export function seedCatalogData(database: Database.Database): void {
   const insertDriveDisc = database.prepare(CATALOG_SQL.insertDriveDisc);
   const insertTeam = database.prepare(CATALOG_SQL.insertTeam);
   const insertMaterial = database.prepare(CATALOG_SQL.insertMaterial);
+  const realAgentRecords = getRealAgentSeedRecords();
+  const agentSeedRecords = realAgentRecords.length > 0 ? realAgentRecords : mockCatalogData.agents;
 
   const seedTransaction = database.transaction(() => {
-    for (const agent of mockCatalogData.agents) {
+    for (const agent of agentSeedRecords) {
       insertAgent.run(agent);
     }
 

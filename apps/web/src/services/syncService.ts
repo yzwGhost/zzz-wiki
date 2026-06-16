@@ -23,3 +23,10 @@ export async function getSyncOverview(): Promise<SyncOverview> {
 export async function getRecentSyncLogs(limit = 10): Promise<SyncLogSummary[]> {
   return getRecentSyncLogsFromBridge(limit);
 }
+
+export async function runRealAgentsSync(): Promise<RunSyncTaskResult> {
+  return runSyncTaskFromBridge({
+    taskName: 'fetch_mhy_agents',
+    target: 'sqlite',
+  });
+}
