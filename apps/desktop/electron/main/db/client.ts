@@ -15,6 +15,24 @@ function ensureWeaponImageColumn(database: Database.Database): void {
   }
 }
 
+function ensureDriveDiscSourceUrlColumn(database: Database.Database): void {
+  const columns = database.pragma('table_info(drive_discs)') as Array<{ name: string }>;
+  const hasSourceUrlColumn = columns.some((column) => column.name === 'source_url');
+
+  if (!hasSourceUrlColumn) {
+    database.exec("ALTER TABLE drive_discs ADD COLUMN source_url TEXT NOT NULL DEFAULT '';");
+  }
+}
+
+function ensureDriveDiscImageColumn(database: Database.Database): void {
+  const columns = database.pragma('table_info(drive_discs)') as Array<{ name: string }>;
+  const hasImageColumn = columns.some((column) => column.name === 'image');
+
+  if (!hasImageColumn) {
+    database.exec("ALTER TABLE drive_discs ADD COLUMN image TEXT NOT NULL DEFAULT '';");
+  }
+}
+
 function resolveDatabasePath(app: App): string {
   if (app.isPackaged) {
     return path.join(app.getPath('userData'), 'app.db');
@@ -39,6 +57,8 @@ export function initializeDatabase(app: App): Database.Database {
     database.exec(statement);
   }
   ensureWeaponImageColumn(database);
+  ensureDriveDiscImageColumn(database);
+  ensureDriveDiscSourceUrlColumn(database);
 
   databaseInstance = database;
   return database;

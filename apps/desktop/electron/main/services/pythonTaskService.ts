@@ -15,6 +15,7 @@ const ALLOWED_TASKS = new Set<SyncTaskName>([
   'bootstrap_agents',
   'fetch_mhy_agents',
   'fetch_mhy_weapons',
+  'fetch_mhy_drive_discs',
 ]);
 const ALLOWED_TARGETS = new Set<SyncTaskTarget>(['json', 'sqlite']);
 

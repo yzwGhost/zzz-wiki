@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import type Database from 'better-sqlite3';
 import { mockCatalogData } from '../../../../../shared/mock-data/catalog';
-import type { Agent, Weapon } from '../../../../../shared/schemas/catalog';
+import type { Agent, DriveDisc, Weapon } from '../../../../../shared/schemas/catalog';
 import { CATALOG_SQL } from './catalogSql';
 
 function toJson(value: unknown): string {
@@ -11,6 +11,10 @@ function toJson(value: unknown): string {
 
 const DELETE_MOCK_WEAPONS_SQL =
   "DELETE FROM weapons WHERE source_url LIKE 'https://example.com/weapons/%';";
+const DELETE_MOCK_AGENTS_SQL =
+  "DELETE FROM agents WHERE source_url LIKE 'https://example.com/agents/%';";
+const DELETE_MOCK_DRIVE_DISCS_SQL =
+  "DELETE FROM drive_discs WHERE source_url LIKE 'https://example.com/drive-discs/%' OR source_url = '';";
 
 type ProcessedCatalogPayload<T> = {
   records?: T[];
@@ -62,9 +66,12 @@ export function seedCatalogData(database: Database.Database): void {
   const insertMaterial = database.prepare(CATALOG_SQL.insertMaterial);
   const realAgentRecords = getProcessedSeedRecords<Agent>('fetch_mhy_agents.json');
   const realWeaponRecords = getProcessedSeedRecords<Weapon>('fetch_mhy_weapons.json');
+  const realDriveDiscRecords = getProcessedSeedRecords<DriveDisc>('fetch_mhy_drive_discs.json');
   const agentSeedRecords = realAgentRecords.length > 0 ? realAgentRecords : mockCatalogData.agents;
   const weaponSeedRecords =
     realWeaponRecords.length > 0 ? realWeaponRecords : mockCatalogData.weapons;
+  const driveDiscSeedRecords =
+    realDriveDiscRecords.length > 0 ? realDriveDiscRecords : mockCatalogData.drive_discs;
 
   const seedTransaction = database.transaction(() => {
     if (countRow.count === 0) {
@@ -80,7 +87,7 @@ export function seedCatalogData(database: Database.Database): void {
         });
       }
 
-      for (const driveDisc of mockCatalogData.drive_discs) {
+      for (const driveDisc of driveDiscSeedRecords) {
         insertDriveDisc.run({
           ...driveDisc,
           fit_agents_json: toJson(driveDisc.fit_agents),
@@ -110,6 +117,14 @@ export function seedCatalogData(database: Database.Database): void {
       database.exec(DELETE_MOCK_WEAPONS_SQL);
     }
 
+    if (realAgentRecords.length > 0) {
+      database.exec(DELETE_MOCK_AGENTS_SQL);
+    }
+
+    if (realDriveDiscRecords.length > 0) {
+      database.exec(DELETE_MOCK_DRIVE_DISCS_SQL);
+    }
+
     for (const agent of realAgentRecords) {
       insertAgent.run(agent);
     }
@@ -119,6 +134,14 @@ export function seedCatalogData(database: Database.Database): void {
         ...weapon,
         fit_roles_json: toJson(weapon.fit_roles),
         fit_agents_json: toJson(weapon.fit_agents),
+      });
+    }
+
+    for (const driveDisc of realDriveDiscRecords) {
+      insertDriveDisc.run({
+        ...driveDisc,
+        fit_agents_json: toJson(driveDisc.fit_agents),
+        fit_scenes_json: toJson(driveDisc.fit_scenes),
       });
     }
   });

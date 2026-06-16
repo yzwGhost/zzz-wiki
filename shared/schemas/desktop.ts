@@ -30,7 +30,11 @@ export interface DesktopCatalogApi {
   getDriveDiscDetailBySlug: (slug: string) => Promise<DriveDiscDetailData | null>;
 }
 
-export type SyncTaskName = 'bootstrap_agents' | 'fetch_mhy_agents' | 'fetch_mhy_weapons';
+export type SyncTaskName =
+  | 'bootstrap_agents'
+  | 'fetch_mhy_agents'
+  | 'fetch_mhy_weapons'
+  | 'fetch_mhy_drive_discs';
 
 export type SyncTaskTarget = 'json' | 'sqlite';
 

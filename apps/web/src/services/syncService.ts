@@ -37,3 +37,10 @@ export async function runRealWeaponsSync(): Promise<RunSyncTaskResult> {
     target: 'sqlite',
   });
 }
+
+export async function runRealDriveDiscsSync(): Promise<RunSyncTaskResult> {
+  return runSyncTaskFromBridge({
+    taskName: 'fetch_mhy_drive_discs',
+    target: 'sqlite',
+  });
+}

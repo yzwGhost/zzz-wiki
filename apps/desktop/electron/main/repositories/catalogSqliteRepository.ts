@@ -34,10 +34,12 @@ interface DriveDiscRow {
   id: string;
   slug: string;
   name: string;
+  image: string;
   two_piece_effect: string;
   four_piece_effect: string;
   fit_agents_json: string;
   fit_scenes_json: string;
+  source_url: string;
   updated_at: string;
 }
 
@@ -94,10 +96,12 @@ function mapDriveDiscRow(row: DriveDiscRow): DriveDisc {
     id: row.id,
     slug: row.slug,
     name: row.name,
+    image: row.image,
     two_piece_effect: row.two_piece_effect,
     four_piece_effect: row.four_piece_effect,
     fit_agents: parseJsonArray(row.fit_agents_json),
     fit_scenes: parseJsonArray(row.fit_scenes_json),
+    source_url: row.source_url,
     updated_at: row.updated_at,
   };
 }

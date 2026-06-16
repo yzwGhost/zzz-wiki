@@ -163,6 +163,11 @@ export async function getSyncOverview(): Promise<SyncOverview> {
           label: '米哈游音擎样本同步',
           targets: ['sqlite', 'json'],
         },
+        {
+          taskName: 'fetch_mhy_drive_discs',
+          label: '绫冲搱娓搁┍鍔ㄧ洏鏍锋湰鍚屾',
+          targets: ['sqlite', 'json'],
+        },
       ],
     };
   }

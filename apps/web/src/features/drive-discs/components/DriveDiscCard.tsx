@@ -15,7 +15,15 @@ export function DriveDiscCard({ driveDisc }: DriveDiscCardProps) {
       <div className="catalog-card__cover catalog-card__cover--compact">
         <Link to={`/drive-discs/${driveDisc.slug}`} className="catalog-card__media-link">
           <div className="catalog-card__disc-visual">
-            <div className="catalog-card__disc-core" aria-hidden="true" />
+            {driveDisc.image ? (
+              <img
+                src={driveDisc.image}
+                alt={driveDisc.name}
+                className="catalog-card__cover-image catalog-card__cover-image--weapon"
+              />
+            ) : (
+              <div className="catalog-card__disc-core" aria-hidden="true" />
+            )}
           </div>
           <div className="catalog-card__cover-overlay">
             <span>DRIVE DISC</span>
@@ -37,9 +45,7 @@ export function DriveDiscCard({ driveDisc }: DriveDiscCardProps) {
             </Tag>
           ))}
         </Space>
-        <Paragraph className="catalog-card__summary">
-          2 件套：{driveDisc.two_piece_effect}
-        </Paragraph>
+        <Paragraph className="catalog-card__summary">2 件套：{driveDisc.two_piece_effect}</Paragraph>
         <Text type="secondary">4 件套：{driveDisc.four_piece_effect}</Text>
       </div>
     </div>

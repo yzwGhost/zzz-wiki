@@ -40,10 +40,12 @@ export const DATABASE_SCHEMA_STATEMENTS = [
       id TEXT PRIMARY KEY,
       slug TEXT NOT NULL UNIQUE,
       name TEXT NOT NULL,
+      image TEXT NOT NULL DEFAULT '',
       two_piece_effect TEXT NOT NULL,
       four_piece_effect TEXT NOT NULL,
       fit_agents_json TEXT NOT NULL,
       fit_scenes_json TEXT NOT NULL,
+      source_url TEXT NOT NULL DEFAULT '',
       updated_at TEXT NOT NULL
     );
   `,

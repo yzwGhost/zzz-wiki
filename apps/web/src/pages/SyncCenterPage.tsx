@@ -31,6 +31,7 @@ import {
   getSyncOverview,
   runBootstrapAgentsSync,
   runRealAgentsSync,
+  runRealDriveDiscsSync,
   runRealWeaponsSync,
 } from '@/services/syncService';
 import { useAppStore } from '@/store/appStore';
@@ -42,7 +43,13 @@ import type {
 } from '@shared/schemas/desktop';
 
 const { Paragraph, Text } = Typography;
+
 type SyncStage = 'idle' | 'preparing' | 'running' | 'success' | 'failed';
+type SyncTaskKey =
+  | 'bootstrap_agents'
+  | 'fetch_mhy_agents'
+  | 'fetch_mhy_weapons'
+  | 'fetch_mhy_drive_discs';
 
 function statusTagColor(status: string) {
   if (status === 'success') {
@@ -79,6 +86,10 @@ function syncTaskLabel(taskName: string) {
 
   if (taskName === 'fetch_mhy_weapons') {
     return '真实音擎样本';
+  }
+
+  if (taskName === 'fetch_mhy_drive_discs') {
+    return '真实驱动盘样本';
   }
 
   if (taskName === 'bootstrap_agents') {
@@ -154,8 +165,7 @@ const columns: ColumnsType<SyncLogSummary> = [
     dataIndex: 'taskName',
     key: 'taskName',
     width: 160,
-    render: (taskName: string) =>
-      syncTaskLabel(taskName),
+    render: (taskName: string) => syncTaskLabel(taskName),
   },
   {
     title: '状态',
@@ -205,9 +215,8 @@ export function SyncCenterPage() {
   const [logs, setLogs] = useState<SyncLogSummary[]>([]);
   const [pageStatus, setPageStatus] = useState<AsyncStatus>('loading');
   const [pageError, setPageError] = useState<UserFacingError | null>(null);
-  const [activeSyncTask, setActiveSyncTask] = useState<
-    'bootstrap_agents' | 'fetch_mhy_agents' | 'fetch_mhy_weapons'
-  >('fetch_mhy_weapons');
+  const [activeSyncTask, setActiveSyncTask] =
+    useState<SyncTaskKey>('fetch_mhy_drive_discs');
   const [syncRunning, setSyncRunning] = useState(false);
   const [syncResult, setSyncResult] = useState<RunSyncTaskResult | null>(null);
   const [syncStage, setSyncStage] = useState<SyncStage>('idle');
@@ -253,15 +262,20 @@ export function SyncCenterPage() {
           ? await runRealAgentsSync()
           : activeSyncTask === 'fetch_mhy_weapons'
             ? await runRealWeaponsSync()
-            : await runBootstrapAgentsSync();
+            : activeSyncTask === 'fetch_mhy_drive_discs'
+              ? await runRealDriveDiscsSync()
+              : await runBootstrapAgentsSync();
+
       setSyncResult(result);
       setSyncStage(result.ok ? 'success' : 'failed');
+
       if (result.ok) {
         void message.success(`同步完成，已写入 ${result.recordCount} 条记录。`);
       } else {
         const syncError = createSyncFailureError(result);
         void message.error(syncError.title);
       }
+
       await loadSyncData();
     } finally {
       setSyncRunning(false);
@@ -279,7 +293,7 @@ export function SyncCenterPage() {
     <div className="page">
       <PageHeader
         title="同步中心"
-        subtitle="集中查看最近同步状态、历史日志和手动同步入口。当前仍保持单任务、手动触发的管理模式，不引入复杂调度。"
+        subtitle="集中查看最近同步状态、历史日志和手动同步入口。当前保持单任务、手动触发的管理模式，不引入复杂调度。"
         tags={['工具管理', 'SQLite 日志', '手动同步']}
       />
 
@@ -288,6 +302,13 @@ export function SyncCenterPage() {
         description="这里展示最新一次同步状态，以及后续失败重试和增量同步的扩展位。"
         extra={
           <Space wrap>
+            <Button
+              type={activeSyncTask === 'fetch_mhy_drive_discs' ? 'primary' : 'default'}
+              disabled={syncRunning}
+              onClick={() => setActiveSyncTask('fetch_mhy_drive_discs')}
+            >
+              真实驱动盘样本
+            </Button>
             <Button
               type={activeSyncTask === 'fetch_mhy_weapons' ? 'primary' : 'default'}
               disabled={syncRunning}
@@ -337,100 +358,93 @@ export function SyncCenterPage() {
 
         {pageStatus === 'success' ? (
           <>
-        <div className="sync-summary-grid">
-          <Card bordered={false} className="panel sync-summary-card">
-            <Text className="sync-summary-card__label">当前任务</Text>
-            <Text className="sync-summary-card__value">
-              {syncTaskLabel(activeSyncTask)}同步
-            </Text>
-          </Card>
-          <Card bordered={false} className="panel sync-summary-card">
-            <Text className="sync-summary-card__label">最近状态</Text>
-            <Tag color={statusTagColor(latestLog?.status ?? 'idle')} className="sync-summary-card__tag">
-              {statusLabel(latestLog?.status ?? 'idle')}
-            </Tag>
-          </Card>
-          <Card bordered={false} className="panel sync-summary-card">
-            <Text className="sync-summary-card__label">日志数量</Text>
-            <Text className="sync-summary-card__value">{logs.length} 条</Text>
-          </Card>
-        </div>
+            <div className="sync-summary-grid">
+              <Card bordered={false} className="panel sync-summary-card">
+                <Text className="sync-summary-card__label">当前任务</Text>
+                <Text className="sync-summary-card__value">
+                  {syncTaskLabel(activeSyncTask)}同步
+                </Text>
+              </Card>
+              <Card bordered={false} className="panel sync-summary-card">
+                <Text className="sync-summary-card__label">最近状态</Text>
+                <Tag color={statusTagColor(latestLog?.status ?? 'idle')} className="sync-summary-card__tag">
+                  {statusLabel(latestLog?.status ?? 'idle')}
+                </Tag>
+              </Card>
+              <Card bordered={false} className="panel sync-summary-card">
+                <Text className="sync-summary-card__label">日志数量</Text>
+                <Text className="sync-summary-card__value">{logs.length} 条</Text>
+              </Card>
+            </div>
 
-        <Card bordered={false} className="panel sync-stage-card">
-          <Text className="sync-summary-card__label">执行阶段</Text>
-          <Steps
-            current={stageIndex(currentStage)}
-            status={stageStatus(currentStage)}
-            size="small"
-            items={[
-              { title: '待命', description: '未执行任务' },
-              { title: '准备', description: '准备发起任务' },
-              { title: '执行中', description: '等待 Python / SQLite 完成' },
-              {
-                title: currentStage === 'failed' ? '失败' : '完成',
-                description: currentStage === 'failed' ? '任务执行失败' : '任务已返回结果',
-              },
-            ]}
-          />
-        </Card>
+            <Card bordered={false} className="panel sync-stage-card">
+              <Text className="sync-summary-card__label">执行阶段</Text>
+              <Steps
+                current={stageIndex(currentStage)}
+                status={stageStatus(currentStage)}
+                size="small"
+                items={[
+                  { title: '待命', description: '未执行任务' },
+                  { title: '准备', description: '准备发起任务' },
+                  { title: '执行中', description: '等待 Python / SQLite 完成' },
+                  {
+                    title: currentStage === 'failed' ? '失败' : '完成',
+                    description: currentStage === 'failed' ? '任务执行失败' : '任务已返回结果',
+                  },
+                ]}
+              />
+            </Card>
 
-        {!bridgeConnected ? (
-          <Alert
-            type="warning"
-            showIcon
-            message={createBridgeUnavailableError().title}
-            description={createBridgeUnavailableError().description}
-          />
-        ) : null}
+            {!bridgeConnected ? (
+              <Alert
+                type="warning"
+                showIcon
+                message={createBridgeUnavailableError().title}
+                description={createBridgeUnavailableError().description}
+              />
+            ) : null}
 
-        {syncResult ? (
-          <Alert
-            style={{ marginTop: bridgeConnected ? 0 : 12 }}
-            type={syncResult.ok ? 'success' : 'error'}
-            showIcon
-            message={syncResult.ok ? '同步执行成功' : '同步执行失败'}
-            description={
-              syncResult.ok
-                ? `任务 ${syncResult.taskName} 已完成，写入 ${syncResult.recordCount} 条记录。`
-                : createSyncFailureError(syncResult).description
-            }
-          />
-        ) : null}
+            {syncResult ? (
+              <Alert
+                style={{ marginTop: bridgeConnected ? 0 : 12 }}
+                type={syncResult.ok ? 'success' : 'error'}
+                showIcon
+                message={syncResult.ok ? '同步执行成功' : '同步执行失败'}
+                description={
+                  syncResult.ok
+                    ? `任务 ${syncResult.taskName} 已完成，写入 ${syncResult.recordCount} 条记录。`
+                    : createSyncFailureError(syncResult).description
+                }
+              />
+            ) : null}
 
-        <Descriptions bordered size="small" column={2} style={{ marginTop: 16 }}>
-          <Descriptions.Item label="最近任务">
-            {latestLog?.taskName ? syncTaskLabel(latestLog.taskName) : '--'}
-          </Descriptions.Item>
-          <Descriptions.Item label="最近状态">
-            {latestLog ? <Tag color={statusTagColor(latestLog.status)}>{statusLabel(latestLog.status)}</Tag> : '--'}
-          </Descriptions.Item>
-          <Descriptions.Item label="开始时间">
-            {latestLog?.startedAt ?? '--'}
-          </Descriptions.Item>
-          <Descriptions.Item label="结束时间">
-            {latestLog?.finishedAt ?? '--'}
-          </Descriptions.Item>
-          <Descriptions.Item label="输出目标">
-            {latestLog?.target ?? '--'}
-          </Descriptions.Item>
-          <Descriptions.Item label="输出路径">
-            {latestLog?.output ?? '--'}
-          </Descriptions.Item>
-          <Descriptions.Item label="记录数">
-            {latestLog?.recordCount ?? '--'}
-          </Descriptions.Item>
-          <Descriptions.Item label="错误码">
-            {latestLog?.errorCode ?? '--'}
-          </Descriptions.Item>
-        </Descriptions>
+            <Descriptions bordered size="small" column={2} style={{ marginTop: 16 }}>
+              <Descriptions.Item label="最近任务">
+                {latestLog?.taskName ? syncTaskLabel(latestLog.taskName) : '--'}
+              </Descriptions.Item>
+              <Descriptions.Item label="最近状态">
+                {latestLog ? (
+                  <Tag color={statusTagColor(latestLog.status)}>{statusLabel(latestLog.status)}</Tag>
+                ) : (
+                  '--'
+                )}
+              </Descriptions.Item>
+              <Descriptions.Item label="开始时间">{latestLog?.startedAt ?? '--'}</Descriptions.Item>
+              <Descriptions.Item label="结束时间">{latestLog?.finishedAt ?? '--'}</Descriptions.Item>
+              <Descriptions.Item label="输出目标">{latestLog?.target ?? '--'}</Descriptions.Item>
+              <Descriptions.Item label="输出路径">{latestLog?.output ?? '--'}</Descriptions.Item>
+              <Descriptions.Item label="记录数">{latestLog?.recordCount ?? '--'}</Descriptions.Item>
+              <Descriptions.Item label="错误码">{latestLog?.errorCode ?? '--'}</Descriptions.Item>
+            </Descriptions>
 
-        <div style={{ marginTop: 16 }}>
-          <Text type="secondary">
-            当前可用任务：
-            {overview?.availableTasks.map((task) => `${task.label} (${task.targets.join(' / ')})`).join('，') ??
-              '--'}
-          </Text>
-        </div>
+            <div style={{ marginTop: 16 }}>
+              <Text type="secondary">
+                当前可用任务：
+                {overview?.availableTasks
+                  .map((task) => `${syncTaskLabel(task.taskName)} (${task.targets.join(' / ')})`)
+                  .join('，') ?? '--'}
+              </Text>
+            </div>
           </>
         ) : null}
       </SectionCard>
@@ -495,15 +509,9 @@ export function SyncCenterPage() {
         description="保留后续失败重试、增量同步和多任务管理所需的位置，但这一阶段不实现复杂调度。"
       >
         <Space direction="vertical" size={8} style={{ display: 'flex' }}>
-          <Paragraph>
-            失败重试：后续可基于最近失败日志直接回填任务参数，一键重跑。
-          </Paragraph>
-          <Paragraph>
-            增量同步：后续可在 Python adapter 内基于源站时间戳或 hash 增量抓取。
-          </Paragraph>
-          <Paragraph>
-            多任务队列：后续可增加任务列表、运行中状态和更细粒度日志详情。
-          </Paragraph>
+          <Paragraph>失败重试：后续可基于最近失败日志直接回填任务参数，一键重跑。</Paragraph>
+          <Paragraph>增量同步：后续可在 Python adapter 内基于源站时间戳或 hash 增量抓取。</Paragraph>
+          <Paragraph>多任务队列：后续可增加任务列表、运行中状态和更细粒度日志详情。</Paragraph>
         </Space>
       </SectionCard>
     </div>

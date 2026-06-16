@@ -75,10 +75,12 @@ export interface DriveDisc {
   id: string;
   slug: string;
   name: string;
+  image: string;
   two_piece_effect: string;
   four_piece_effect: string;
   fit_agents: string[];
   fit_scenes: string[];
+  source_url: string;
   updated_at: string;
 }
 

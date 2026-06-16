@@ -49,7 +49,24 @@ class WeaponRecord:
         return asdict(self)
 
 
-CatalogRecord = AgentRecord | WeaponRecord
+@dataclass(slots=True)
+class DriveDiscRecord:
+    id: str
+    slug: str
+    name: str
+    image: str
+    two_piece_effect: str
+    four_piece_effect: str
+    fit_agents: list[str]
+    fit_scenes: list[str]
+    source_url: str
+    updated_at: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+CatalogRecord = AgentRecord | WeaponRecord | DriveDiscRecord
 
 
 @dataclass(slots=True)

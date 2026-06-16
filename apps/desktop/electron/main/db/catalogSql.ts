@@ -32,15 +32,15 @@ export const CATALOG_SQL = {
   `,
   selectDriveDiscs: `
     SELECT
-      id, slug, name, two_piece_effect, four_piece_effect,
-      fit_agents_json, fit_scenes_json, updated_at
+      id, slug, name, image, two_piece_effect, four_piece_effect,
+      fit_agents_json, fit_scenes_json, source_url, updated_at
     FROM drive_discs
     ORDER BY updated_at DESC, name ASC;
   `,
   selectDriveDiscBySlug: `
     SELECT
-      id, slug, name, two_piece_effect, four_piece_effect,
-      fit_agents_json, fit_scenes_json, updated_at
+      id, slug, name, image, two_piece_effect, four_piece_effect,
+      fit_agents_json, fit_scenes_json, source_url, updated_at
     FROM drive_discs
     WHERE slug = ?;
   `,
@@ -78,11 +78,11 @@ export const CATALOG_SQL = {
   `,
   insertDriveDisc: `
     INSERT OR REPLACE INTO drive_discs (
-      id, slug, name, two_piece_effect, four_piece_effect,
-      fit_agents_json, fit_scenes_json, updated_at
+      id, slug, name, image, two_piece_effect, four_piece_effect,
+      fit_agents_json, fit_scenes_json, source_url, updated_at
     ) VALUES (
-      @id, @slug, @name, @two_piece_effect, @four_piece_effect,
-      @fit_agents_json, @fit_scenes_json, @updated_at
+      @id, @slug, @name, @image, @two_piece_effect, @four_piece_effect,
+      @fit_agents_json, @fit_scenes_json, @source_url, @updated_at
     );
   `,
   insertTeam: `
