@@ -31,6 +31,7 @@ import {
   getSyncOverview,
   runBootstrapAgentsSync,
   runRealAgentsSync,
+  runRealWeaponsSync,
 } from '@/services/syncService';
 import { useAppStore } from '@/store/appStore';
 import type {
@@ -69,6 +70,22 @@ function statusLabel(status: string) {
   }
 
   return '待命';
+}
+
+function syncTaskLabel(taskName: string) {
+  if (taskName === 'fetch_mhy_agents') {
+    return '真实角色样本';
+  }
+
+  if (taskName === 'fetch_mhy_weapons') {
+    return '真实音擎样本';
+  }
+
+  if (taskName === 'bootstrap_agents') {
+    return '本地样例';
+  }
+
+  return taskName;
 }
 
 function toSyncStage(
@@ -138,7 +155,7 @@ const columns: ColumnsType<SyncLogSummary> = [
     key: 'taskName',
     width: 160,
     render: (taskName: string) =>
-      taskName === 'fetch_mhy_agents' ? '真实角色样本' : taskName === 'bootstrap_agents' ? '本地样例' : taskName,
+      syncTaskLabel(taskName),
   },
   {
     title: '状态',
@@ -188,7 +205,9 @@ export function SyncCenterPage() {
   const [logs, setLogs] = useState<SyncLogSummary[]>([]);
   const [pageStatus, setPageStatus] = useState<AsyncStatus>('loading');
   const [pageError, setPageError] = useState<UserFacingError | null>(null);
-  const [activeSyncTask, setActiveSyncTask] = useState<'bootstrap_agents' | 'fetch_mhy_agents'>('fetch_mhy_agents');
+  const [activeSyncTask, setActiveSyncTask] = useState<
+    'bootstrap_agents' | 'fetch_mhy_agents' | 'fetch_mhy_weapons'
+  >('fetch_mhy_weapons');
   const [syncRunning, setSyncRunning] = useState(false);
   const [syncResult, setSyncResult] = useState<RunSyncTaskResult | null>(null);
   const [syncStage, setSyncStage] = useState<SyncStage>('idle');
@@ -232,7 +251,9 @@ export function SyncCenterPage() {
       const result =
         activeSyncTask === 'fetch_mhy_agents'
           ? await runRealAgentsSync()
-          : await runBootstrapAgentsSync();
+          : activeSyncTask === 'fetch_mhy_weapons'
+            ? await runRealWeaponsSync()
+            : await runBootstrapAgentsSync();
       setSyncResult(result);
       setSyncStage(result.ok ? 'success' : 'failed');
       if (result.ok) {
@@ -268,6 +289,13 @@ export function SyncCenterPage() {
         extra={
           <Space wrap>
             <Button
+              type={activeSyncTask === 'fetch_mhy_weapons' ? 'primary' : 'default'}
+              disabled={syncRunning}
+              onClick={() => setActiveSyncTask('fetch_mhy_weapons')}
+            >
+              真实音擎样本
+            </Button>
+            <Button
               type={activeSyncTask === 'fetch_mhy_agents' ? 'primary' : 'default'}
               disabled={syncRunning}
               onClick={() => setActiveSyncTask('fetch_mhy_agents')}
@@ -288,8 +316,8 @@ export function SyncCenterPage() {
               onClick={() => void handleRunSync()}
             >
               {syncRunning
-                ? `正在执行 ${activeSyncTask === 'fetch_mhy_agents' ? '真实角色样本' : '本地样例数据'}`
-                : `执行${activeSyncTask === 'fetch_mhy_agents' ? '真实角色样本' : '本地样例数据'}同步`}
+                ? `正在执行 ${syncTaskLabel(activeSyncTask)}`
+                : `执行${syncTaskLabel(activeSyncTask)}同步`}
             </Button>
             <Button disabled>失败重试（预留）</Button>
             <Button disabled>增量同步（预留）</Button>
@@ -313,7 +341,7 @@ export function SyncCenterPage() {
           <Card bordered={false} className="panel sync-summary-card">
             <Text className="sync-summary-card__label">当前任务</Text>
             <Text className="sync-summary-card__value">
-              {activeSyncTask === 'fetch_mhy_agents' ? '真实角色样本同步' : '本地样例同步'}
+              {syncTaskLabel(activeSyncTask)}同步
             </Text>
           </Card>
           <Card bordered={false} className="panel sync-summary-card">
@@ -371,11 +399,7 @@ export function SyncCenterPage() {
 
         <Descriptions bordered size="small" column={2} style={{ marginTop: 16 }}>
           <Descriptions.Item label="最近任务">
-            {latestLog?.taskName === 'fetch_mhy_agents'
-              ? '真实角色样本'
-              : latestLog?.taskName === 'bootstrap_agents'
-                ? '本地样例'
-                : latestLog?.taskName ?? '--'}
+            {latestLog?.taskName ? syncTaskLabel(latestLog.taskName) : '--'}
           </Descriptions.Item>
           <Descriptions.Item label="最近状态">
             {latestLog ? <Tag color={statusTagColor(latestLog.status)}>{statusLabel(latestLog.status)}</Tag> : '--'}

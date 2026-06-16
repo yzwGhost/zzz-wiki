@@ -45,12 +45,22 @@
   - `sync_logs`
 - Python crawler 最小任务：
   - `bootstrap_agents`
+  - `fetch_mhy_agents`
+  - `fetch_mhy_weapons`
 - 最小同步链路：
   - `React -> preload -> Electron -> Python -> SQLite`
 
+### 真实数据接入现状
+
+- 已接入米哈游大百科绝区零 Wiki 角色首源适配器
+- 已接入米哈游大百科绝区零 Wiki 音擎首源适配器
+- 角色与音擎均支持“真实样本优先，mock 兜底”的最小闭环
+- `/agents` 与 `/weapons` 在 Electron + SQLite 链路下可读取真实样本
+- 原始快照与标准化快照已落在 `services/crawler/data/raw` 与 `services/crawler/data/processed`
+
 ## 当前未完成
 
-- 真正的外部数据源 adapter
+- 驱动盘真实外部数据源 adapter
 - 自动定时同步
 - 失败重试的实际执行逻辑
 - 增量同步策略
@@ -72,11 +82,11 @@ D:\tools\nvm\v20.19.0\pnpm.CMD dev
 1. 首页、角色、音擎、驱动盘、同步中心页面可以打开。
 2. 角色、音擎、驱动盘列表和详情可展示。
 3. 收藏、搜索、筛选仍可工作。
-4. 在同步中心中手动触发同步，可看到最近状态与日志。
+4. 在同步中心中手动触发角色或音擎同步，可看到最近状态与日志。
 5. `storage/app.db` 中存在同步日志记录。
 
 ## 当前主要风险
 
 - `better-sqlite3` 依赖 Electron ABI，开发环境对 Node / Electron 版本较敏感。
-- crawler 仍然是样例任务，尚未接真实数据源。
+- 真实数据目前只覆盖角色和音擎的少量样本，尚未扩展到驱动盘与更大范围抓取。
 - OpenSpec 命令在某些非交互 shell 中不在 PATH，需要按本机环境补齐。

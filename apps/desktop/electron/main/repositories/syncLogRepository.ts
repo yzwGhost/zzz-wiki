@@ -87,6 +87,11 @@ export const syncLogRepository = {
           label: '米哈游角色样本同步',
           targets: ['sqlite', 'json'],
         },
+        {
+          taskName: 'fetch_mhy_weapons',
+          label: '米哈游音擎样本同步',
+          targets: ['sqlite', 'json'],
+        },
       ],
     };
   },

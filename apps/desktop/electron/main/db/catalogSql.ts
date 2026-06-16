@@ -18,14 +18,14 @@ export const CATALOG_SQL = {
   `,
   selectWeapons: `
     SELECT
-      id, slug, name, rarity, base_stat, sub_stat, effect_desc,
+      id, slug, name, rarity, image, base_stat, sub_stat, effect_desc,
       fit_roles_json, fit_agents_json, source_url, updated_at
     FROM weapons
     ORDER BY updated_at DESC, name ASC;
   `,
   selectWeaponBySlug: `
     SELECT
-      id, slug, name, rarity, base_stat, sub_stat, effect_desc,
+      id, slug, name, rarity, image, base_stat, sub_stat, effect_desc,
       fit_roles_json, fit_agents_json, source_url, updated_at
     FROM weapons
     WHERE slug = ?;
@@ -69,10 +69,10 @@ export const CATALOG_SQL = {
   `,
   insertWeapon: `
     INSERT OR REPLACE INTO weapons (
-      id, slug, name, rarity, base_stat, sub_stat, effect_desc,
+      id, slug, name, rarity, image, base_stat, sub_stat, effect_desc,
       fit_roles_json, fit_agents_json, source_url, updated_at
     ) VALUES (
-      @id, @slug, @name, @rarity, @base_stat, @sub_stat, @effect_desc,
+      @id, @slug, @name, @rarity, @image, @base_stat, @sub_stat, @effect_desc,
       @fit_roles_json, @fit_agents_json, @source_url, @updated_at
     );
   `,

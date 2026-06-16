@@ -5,7 +5,7 @@ import sqlite3
 from contextlib import closing
 
 from src.exporters.base import Exporter
-from src.models.records import TaskRunResult
+from src.models.records import AgentRecord, TaskRunResult, WeaponRecord
 from src.utils.paths import get_storage_db_path
 
 
@@ -68,11 +68,64 @@ CREATE TABLE IF NOT EXISTS sync_logs (
 );
 """
 
+CREATE_WEAPONS_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS weapons (
+  id TEXT PRIMARY KEY,
+  slug TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  rarity TEXT NOT NULL,
+  image TEXT NOT NULL,
+  base_stat TEXT NOT NULL,
+  sub_stat TEXT NOT NULL,
+  effect_desc TEXT NOT NULL,
+  fit_roles_json TEXT NOT NULL,
+  fit_agents_json TEXT NOT NULL,
+  source_url TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+"""
+
+UPSERT_WEAPON_SQL = """
+INSERT INTO weapons (
+  id, slug, name, rarity, image, base_stat, sub_stat, effect_desc,
+  fit_roles_json, fit_agents_json, source_url, updated_at
+) VALUES (
+  :id, :slug, :name, :rarity, :image, :base_stat, :sub_stat, :effect_desc,
+  :fit_roles_json, :fit_agents_json, :source_url, :updated_at
+)
+ON CONFLICT(slug) DO UPDATE SET
+  id=excluded.id,
+  name=excluded.name,
+  rarity=excluded.rarity,
+  image=excluded.image,
+  base_stat=excluded.base_stat,
+  sub_stat=excluded.sub_stat,
+  effect_desc=excluded.effect_desc,
+  fit_roles_json=excluded.fit_roles_json,
+  fit_agents_json=excluded.fit_agents_json,
+  source_url=excluded.source_url,
+  updated_at=excluded.updated_at;
+"""
+
 INSERT_SYNC_LOG_SQL = """
 INSERT INTO sync_logs (
   id, task_name, status, started_at, finished_at, message, payload_json
 ) VALUES (?, ?, ?, ?, ?, ?, ?);
 """
+
+DELETE_MOCK_WEAPONS_SQL = """
+DELETE FROM weapons WHERE source_url LIKE 'https://example.com/weapons/%';
+"""
+
+
+def ensure_weapon_image_column(connection: sqlite3.Connection) -> None:
+    columns = connection.execute("PRAGMA table_info(weapons);").fetchall()
+    has_image_column = any(column[1] == "image" for column in columns)
+
+    if not has_image_column:
+        connection.execute(
+            "ALTER TABLE weapons ADD COLUMN image TEXT NOT NULL DEFAULT '';"
+        )
 
 
 class SqliteExporter(Exporter):
@@ -84,10 +137,24 @@ class SqliteExporter(Exporter):
 
         with closing(sqlite3.connect(database_path)) as connection:
             connection.execute(CREATE_AGENTS_TABLE_SQL)
+            connection.execute(CREATE_WEAPONS_TABLE_SQL)
             connection.execute(CREATE_SYNC_LOGS_TABLE_SQL)
-
+            ensure_weapon_image_column(connection)
+            if any(isinstance(record, WeaponRecord) for record in result.records):
+                connection.execute(DELETE_MOCK_WEAPONS_SQL)
             for record in result.records:
-                connection.execute(UPSERT_AGENT_SQL, record.to_dict())
+                if isinstance(record, AgentRecord):
+                    connection.execute(UPSERT_AGENT_SQL, record.to_dict())
+                elif isinstance(record, WeaponRecord):
+                    payload = record.to_dict()
+                    connection.execute(
+                        UPSERT_WEAPON_SQL,
+                        {
+                            **payload,
+                            "fit_roles_json": json.dumps(payload["fit_roles"], ensure_ascii=False),
+                            "fit_agents_json": json.dumps(payload["fit_agents"], ensure_ascii=False),
+                        },
+                    )
 
             connection.execute(
                 INSERT_SYNC_LOG_SQL,

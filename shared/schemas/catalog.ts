@@ -61,6 +61,7 @@ export interface Weapon {
   slug: string;
   name: string;
   rarity: Rarity;
+  image: string;
   base_stat: string;
   sub_stat: string;
   effect_desc: string;

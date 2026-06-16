@@ -12,10 +12,14 @@ export function WeaponBasicSection({ weapon }: WeaponBasicSectionProps) {
   return (
     <SectionCard title="基础资料">
       <div className="detail-hero detail-hero--compact">
-        <div className="catalog-card__poster catalog-card__poster--detail">
-          <span>W-ENGINE</span>
-          <strong>{weapon.name}</strong>
-        </div>
+        {weapon.image ? (
+          <img className="detail-hero__image" src={weapon.image} alt={weapon.name} />
+        ) : (
+          <div className="catalog-card__poster catalog-card__poster--detail">
+            <span>W-ENGINE</span>
+            <strong>{weapon.name}</strong>
+          </div>
+        )}
       </div>
 
       <Space wrap className="agent-detail__tag-row">

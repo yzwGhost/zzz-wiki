@@ -4,7 +4,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 
-RawAgentRecord = dict[str, Any]
+RawCatalogRecord = dict[str, Any]
 
 
 @dataclass(slots=True)
@@ -31,6 +31,28 @@ class AgentRecord:
 
 
 @dataclass(slots=True)
+class WeaponRecord:
+    id: str
+    slug: str
+    name: str
+    rarity: str
+    image: str
+    base_stat: str
+    sub_stat: str
+    effect_desc: str
+    fit_roles: list[str]
+    fit_agents: list[str]
+    source_url: str
+    updated_at: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+CatalogRecord = AgentRecord | WeaponRecord
+
+
+@dataclass(slots=True)
 class TaskRunResult:
     log_id: str
     task_name: str
@@ -39,8 +61,8 @@ class TaskRunResult:
     started_at: str
     finished_at: str
     message: str
-    raw_records: list[RawAgentRecord]
-    records: list[AgentRecord]
+    raw_records: list[RawCatalogRecord]
+    records: list[CatalogRecord]
 
     def to_payload(self) -> dict[str, Any]:
         return {

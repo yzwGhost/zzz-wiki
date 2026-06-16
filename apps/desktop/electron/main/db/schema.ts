@@ -25,6 +25,7 @@ export const DATABASE_SCHEMA_STATEMENTS = [
       slug TEXT NOT NULL UNIQUE,
       name TEXT NOT NULL,
       rarity TEXT NOT NULL,
+      image TEXT NOT NULL DEFAULT '',
       base_stat TEXT NOT NULL,
       sub_stat TEXT NOT NULL,
       effect_desc TEXT NOT NULL,

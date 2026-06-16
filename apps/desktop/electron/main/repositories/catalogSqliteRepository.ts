@@ -20,6 +20,7 @@ interface WeaponRow {
   slug: string;
   name: string;
   rarity: 'A' | 'S';
+  image: string;
   base_stat: string;
   sub_stat: string;
   effect_desc: string;
@@ -77,6 +78,7 @@ function mapWeaponRow(row: WeaponRow): Weapon {
     slug: row.slug,
     name: row.name,
     rarity: row.rarity,
+    image: row.image,
     base_stat: row.base_stat,
     sub_stat: row.sub_stat,
     effect_desc: row.effect_desc,

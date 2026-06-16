@@ -11,10 +11,24 @@ interface WeaponCardProps {
 
 export function WeaponCard({ weapon }: WeaponCardProps) {
   return (
-    <div className="catalog-card">
+    <div className="catalog-card catalog-card--weapon">
       <div className="catalog-card__cover catalog-card__cover--compact">
         <Link to={`/weapons/${weapon.slug}`} className="catalog-card__media-link">
-          <div className="catalog-card__poster">
+          <div className="catalog-card__weapon-visual">
+            {weapon.image ? (
+              <img
+                src={weapon.image}
+                alt={weapon.name}
+                className="catalog-card__cover-image catalog-card__cover-image--weapon"
+              />
+            ) : (
+              <div className="catalog-card__poster">
+                <span>W-ENGINE</span>
+                <strong>{weapon.name}</strong>
+              </div>
+            )}
+          </div>
+          <div className="catalog-card__weapon-overlay">
             <span>W-ENGINE</span>
             <strong>{weapon.name}</strong>
           </div>
@@ -26,7 +40,7 @@ export function WeaponCard({ weapon }: WeaponCardProps) {
         />
       </div>
 
-      <div className="catalog-card__body">
+      <div className="catalog-card__body catalog-card__body--weapon">
         <Space wrap>
           <Tag className="accent-tag">{weapon.rarity}</Tag>
           {weapon.fit_roles.map((role) => (
@@ -34,9 +48,6 @@ export function WeaponCard({ weapon }: WeaponCardProps) {
           ))}
         </Space>
 
-        <Title level={4}>
-          <Link to={`/weapons/${weapon.slug}`}>{weapon.name}</Link>
-        </Title>
         <Text className="catalog-card__meta">
           {weapon.base_stat} · {weapon.sub_stat}
         </Text>

@@ -11,6 +11,10 @@ from src.tasks.fetch_mhy_agents import (
     TASK_NAME as FETCH_MHY_AGENTS_TASK_NAME,
     run_fetch_mhy_agents_task,
 )
+from src.tasks.fetch_mhy_weapons import (
+    TASK_NAME as FETCH_MHY_WEAPONS_TASK_NAME,
+    run_fetch_mhy_weapons_task,
+)
 from src.utils.errors import CrawlerError, UnsupportedExportTargetError
 from src.utils.logging import configure_logging, get_logger
 
@@ -18,6 +22,7 @@ from src.utils.logging import configure_logging, get_logger
 TASK_REGISTRY = {
     TASK_NAME: run_bootstrap_agents_task,
     FETCH_MHY_AGENTS_TASK_NAME: run_fetch_mhy_agents_task,
+    FETCH_MHY_WEAPONS_TASK_NAME: run_fetch_mhy_weapons_task,
 }
 
 EXPORTERS = {

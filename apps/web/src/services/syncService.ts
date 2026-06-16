@@ -30,3 +30,10 @@ export async function runRealAgentsSync(): Promise<RunSyncTaskResult> {
     target: 'sqlite',
   });
 }
+
+export async function runRealWeaponsSync(): Promise<RunSyncTaskResult> {
+  return runSyncTaskFromBridge({
+    taskName: 'fetch_mhy_weapons',
+    target: 'sqlite',
+  });
+}

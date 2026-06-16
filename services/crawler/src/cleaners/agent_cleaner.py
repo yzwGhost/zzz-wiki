@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from src.models.records import AgentRecord, RawAgentRecord
+from src.models.records import AgentRecord, RawCatalogRecord
 from src.utils.errors import CrawlerValidationError
 
 
@@ -22,7 +22,7 @@ REQUIRED_FIELDS = (
 )
 
 
-def clean_agent_record(raw_record: RawAgentRecord) -> AgentRecord:
+def clean_agent_record(raw_record: RawCatalogRecord) -> AgentRecord:
     missing_fields = [field for field in REQUIRED_FIELDS if not raw_record.get(field)]
     if missing_fields:
         raise CrawlerValidationError(

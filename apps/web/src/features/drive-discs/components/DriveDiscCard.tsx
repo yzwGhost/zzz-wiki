@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import type { DriveDisc } from '@shared/schemas/catalog';
 import { FavoriteToggleButton } from '@/components/FavoriteToggleButton';
 
-const { Paragraph, Text, Title } = Typography;
+const { Paragraph, Text } = Typography;
 
 interface DriveDiscCardProps {
   driveDisc: DriveDisc;
@@ -11,10 +11,13 @@ interface DriveDiscCardProps {
 
 export function DriveDiscCard({ driveDisc }: DriveDiscCardProps) {
   return (
-    <div className="catalog-card">
+    <div className="catalog-card catalog-card--drive-disc">
       <div className="catalog-card__cover catalog-card__cover--compact">
         <Link to={`/drive-discs/${driveDisc.slug}`} className="catalog-card__media-link">
-          <div className="catalog-card__poster catalog-card__poster--disc">
+          <div className="catalog-card__disc-visual">
+            <div className="catalog-card__disc-core" aria-hidden="true" />
+          </div>
+          <div className="catalog-card__cover-overlay">
             <span>DRIVE DISC</span>
             <strong>{driveDisc.name}</strong>
           </div>
@@ -34,9 +37,6 @@ export function DriveDiscCard({ driveDisc }: DriveDiscCardProps) {
             </Tag>
           ))}
         </Space>
-        <Title level={4}>
-          <Link to={`/drive-discs/${driveDisc.slug}`}>{driveDisc.name}</Link>
-        </Title>
         <Paragraph className="catalog-card__summary">
           2 件套：{driveDisc.two_piece_effect}
         </Paragraph>

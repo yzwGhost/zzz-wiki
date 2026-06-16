@@ -6,6 +6,15 @@ import { DATABASE_SCHEMA_STATEMENTS } from './schema';
 
 let databaseInstance: Database.Database | null = null;
 
+function ensureWeaponImageColumn(database: Database.Database): void {
+  const columns = database.pragma('table_info(weapons)') as Array<{ name: string }>;
+  const hasImageColumn = columns.some((column) => column.name === 'image');
+
+  if (!hasImageColumn) {
+    database.exec("ALTER TABLE weapons ADD COLUMN image TEXT NOT NULL DEFAULT '';");
+  }
+}
+
 function resolveDatabasePath(app: App): string {
   if (app.isPackaged) {
     return path.join(app.getPath('userData'), 'app.db');
@@ -29,6 +38,7 @@ export function initializeDatabase(app: App): Database.Database {
   for (const statement of DATABASE_SCHEMA_STATEMENTS) {
     database.exec(statement);
   }
+  ensureWeaponImageColumn(database);
 
   databaseInstance = database;
   return database;
