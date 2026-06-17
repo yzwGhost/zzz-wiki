@@ -43,10 +43,25 @@ export type RetryableSyncTaskName =
   | 'fetch_mhy_drive_discs';
 
 export type SyncTaskTarget = 'json' | 'sqlite';
+export type SyncTriggerMode = 'manual' | 'automatic' | 'retry';
 
 export interface RunSyncTaskRequest {
   taskName: SyncTaskName;
   target: SyncTaskTarget;
+  triggerMode?: SyncTriggerMode;
+}
+
+export interface AutoSyncConfig {
+  enabled: boolean;
+  intervalHours: number;
+}
+
+export interface AutoSyncState {
+  config: AutoSyncConfig;
+  nextRunAt: string | null;
+  lastScheduledAt: string | null;
+  isRunning: boolean;
+  lastAutoSyncLog: SyncLogSummary | null;
 }
 
 export interface SyncIncrementalSummary {
@@ -93,6 +108,7 @@ export interface SyncTaskSuccessResult {
   ok: true;
   taskName: SyncTaskName;
   target: SyncTaskTarget;
+  triggerMode?: SyncTriggerMode;
   output: string;
   status: string;
   recordCount: number;
@@ -110,6 +126,7 @@ export interface SyncTaskFailureResult {
   ok: false;
   taskName: SyncTaskName;
   target: SyncTaskTarget;
+  triggerMode?: SyncTriggerMode;
   errorCode: string;
   errorMessage: string;
   stdout: string;
@@ -156,6 +173,7 @@ export interface SyncLogSummary {
   id: string;
   taskName: string;
   status: string;
+  triggerMode?: SyncTriggerMode | null;
   startedAt: string;
   finishedAt: string | null;
   message: string;
@@ -186,6 +204,8 @@ export interface DesktopSyncApi {
   retrySubtask: (request: RetrySyncSubtaskRequest) => Promise<RetrySyncSubtaskResult>;
   getOverview: () => Promise<SyncOverview>;
   getRecentLogs: (limit?: number) => Promise<SyncLogSummary[]>;
+  getAutoSyncState: () => Promise<AutoSyncState>;
+  updateAutoSyncConfig: (config: AutoSyncConfig) => Promise<AutoSyncState>;
 }
 
 export interface DesktopApi {

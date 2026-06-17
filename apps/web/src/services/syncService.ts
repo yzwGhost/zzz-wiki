@@ -1,4 +1,6 @@
 import type {
+  AutoSyncConfig,
+  AutoSyncState,
   RetrySyncSubtaskResult,
   RunSyncTaskResult,
   SyncLogSummary,
@@ -6,9 +8,11 @@ import type {
 } from '@shared/schemas/desktop';
 import {
   getRecentSyncLogs as getRecentSyncLogsFromBridge,
+  getAutoSyncState as getAutoSyncStateFromBridge,
   getSyncOverview as getSyncOverviewFromBridge,
   retrySyncSubtask as retrySyncSubtaskFromBridge,
   runSyncTask as runSyncTaskFromBridge,
+  updateAutoSyncConfig as updateAutoSyncConfigFromBridge,
 } from '@/services/desktopBridgeService';
 
 export async function runBootstrapAgentsSync(): Promise<RunSyncTaskResult> {
@@ -31,6 +35,14 @@ export async function getSyncOverview(): Promise<SyncOverview> {
 
 export async function getRecentSyncLogs(limit = 10): Promise<SyncLogSummary[]> {
   return getRecentSyncLogsFromBridge(limit);
+}
+
+export async function getAutoSyncState(): Promise<AutoSyncState> {
+  return getAutoSyncStateFromBridge();
+}
+
+export async function updateAutoSyncConfig(config: AutoSyncConfig): Promise<AutoSyncState> {
+  return updateAutoSyncConfigFromBridge(config);
 }
 
 export async function runRealAgentsSync(): Promise<RunSyncTaskResult> {

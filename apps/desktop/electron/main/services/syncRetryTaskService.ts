@@ -13,6 +13,7 @@ export const syncRetryTaskService = {
       {
         taskName: request.taskName,
         target: request.target,
+        triggerMode: 'retry',
       },
       { skipFailureLog: true },
     );
@@ -36,6 +37,7 @@ export const syncRetryTaskService = {
         : `手动重试失败：${request.taskName}`,
       payloadJson: JSON.stringify({
         target: request.target,
+        triggerMode: 'retry',
         output: retryResult.ok ? retryResult.output : retryResult.output ?? null,
         recordCount: retryResult.ok ? retryResult.recordCount : retryResult.recordCount ?? 0,
         errorCode: retryResult.ok ? null : retryResult.errorCode,

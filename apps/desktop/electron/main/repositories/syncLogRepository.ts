@@ -2,9 +2,11 @@ import { randomUUID } from 'node:crypto';
 import { CATALOG_SQL } from '../db/catalogSql';
 import { getDatabase } from '../db/client';
 import type {
+  AutoSyncState,
   RunSyncTaskRequest,
   RunSyncTaskResult,
   SyncIncrementalSummary,
+  SyncTriggerMode,
   SyncRetryMetadata,
   SyncTaskAggregateSummary,
   SyncLogSummary,
@@ -23,6 +25,8 @@ interface SyncLogRow {
 
 interface SyncPayloadShape {
   target?: 'json' | 'sqlite';
+  trigger_mode?: SyncTriggerMode;
+  triggerMode?: SyncTriggerMode;
   output?: string;
   record_count?: number;
   recordCount?: number;
@@ -138,6 +142,7 @@ function mapRowToSummary(row: SyncLogRow): SyncLogSummary {
     id: row.id,
     taskName: row.task_name,
     status: row.status,
+    triggerMode: payload.trigger_mode ?? payload.triggerMode ?? null,
     startedAt: row.started_at,
     finishedAt: row.finished_at,
     message: row.message,
@@ -210,6 +215,12 @@ export const syncLogRepository = {
     };
   },
 
+  getLatestAutoSyncLog(): SyncLogSummary | null {
+    return this.getRecentLogs(50).find(
+      (log) => log.taskName === 'sync_catalog' && log.triggerMode === 'automatic',
+    ) ?? null;
+  },
+
   insertRunLog(payload: {
     taskName: string;
     status: 'success' | 'failed';
@@ -243,6 +254,7 @@ export const syncLogRepository = {
       message: result.errorMessage,
       payloadJson: JSON.stringify({
         target: request.target,
+        triggerMode: request.triggerMode ?? 'manual',
         errorCode: result.errorCode,
         stdout: result.stdout,
         stderr: result.stderr,

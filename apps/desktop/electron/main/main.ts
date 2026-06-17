@@ -5,9 +5,21 @@ import type { DesktopAppInfo } from '../../../../shared/schemas/desktop';
 import { initializeDatabase } from './db/client';
 import { seedCatalogData } from './db/seed';
 import { catalogBridgeService } from './services/catalogBridgeService';
+import { autoSyncSchedulerService } from './services/autoSyncSchedulerService';
+import { runtimeDiagnosticsService } from './services/runtimeDiagnosticsService';
 import { syncBridgeService } from './services/syncBridgeService';
+import { getWebDistPath, isPackagedRuntime } from './utils/runtimePaths';
 
 const DEV_SERVER_URL = 'http://127.0.0.1:5173';
+
+function getInitialHashRoute(): string | undefined {
+  const rawRoute = process.env.ZZZ_INITIAL_HASH_ROUTE?.trim();
+  if (!rawRoute) {
+    return undefined;
+  }
+
+  return rawRoute.replace(/^#?\/?/u, '');
+}
 
 function createAppInfo(): DesktopAppInfo {
   return {
@@ -29,6 +41,10 @@ function registerIpcHandlers() {
   ipcMain.handle(IPC_CHANNELS.sync.getOverview, () => syncBridgeService.getOverview());
   ipcMain.handle(IPC_CHANNELS.sync.getRecentLogs, (_, limit?: number) =>
     syncBridgeService.getRecentLogs(limit),
+  );
+  ipcMain.handle(IPC_CHANNELS.sync.getAutoSyncState, () => syncBridgeService.getAutoSyncState());
+  ipcMain.handle(IPC_CHANNELS.sync.updateAutoSyncConfig, (_, config) =>
+    syncBridgeService.updateAutoSyncConfig(config),
   );
   ipcMain.handle(IPC_CHANNELS.catalog.getOverview, () => catalogBridgeService.getOverview());
   ipcMain.handle(IPC_CHANNELS.catalog.queryAgents, (_, filters) =>
@@ -52,11 +68,15 @@ function registerIpcHandlers() {
 }
 
 async function loadRenderer(window: BrowserWindow) {
-  const isDev = !app.isPackaged;
+  const isDev = !isPackagedRuntime();
+  const initialHashRoute = getInitialHashRoute();
 
   if (isDev) {
     try {
-      await window.loadURL(DEV_SERVER_URL);
+      const targetUrl = initialHashRoute
+        ? `${DEV_SERVER_URL}/#/${initialHashRoute}`
+        : DEV_SERVER_URL;
+      await window.loadURL(targetUrl);
       return;
     } catch {
       setTimeout(() => {
@@ -66,8 +86,10 @@ async function loadRenderer(window: BrowserWindow) {
     }
   }
 
-  const indexHtmlPath = path.resolve(process.cwd(), '../web/dist/index.html');
-  await window.loadFile(indexHtmlPath);
+  const indexHtmlPath = path.join(getWebDistPath(), 'index.html');
+  await window.loadFile(indexHtmlPath, {
+    hash: initialHashRoute ? `/${initialHashRoute}` : undefined,
+  });
 }
 
 async function createMainWindow() {
@@ -93,6 +115,14 @@ async function createMainWindow() {
   });
 
   mainWindow.removeMenu();
+  mainWindow.webContents.on('did-finish-load', () => {
+    const loadedUrl = mainWindow.webContents.getURL();
+    const routeHash = new URL(loadedUrl).hash;
+    runtimeDiagnosticsService.writeRendererSnapshot({
+      loadedUrl,
+      routeHash,
+    });
+  });
 
   await loadRenderer(mainWindow);
 }
@@ -100,7 +130,9 @@ async function createMainWindow() {
 app.whenReady().then(async () => {
   const database = initializeDatabase(app);
   seedCatalogData(database);
+  runtimeDiagnosticsService.writeStartupSnapshot();
   registerIpcHandlers();
+  autoSyncSchedulerService.initialize(app);
   await createMainWindow();
 
   app.on('activate', () => {
@@ -111,6 +143,7 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
+  autoSyncSchedulerService.dispose();
   if (process.platform !== 'darwin') {
     app.quit();
   }

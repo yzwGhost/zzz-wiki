@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { App } from 'electron';
 import Database from 'better-sqlite3';
 import { DATABASE_SCHEMA_STATEMENTS } from './schema';
+import { getDatabasePath } from '../utils/runtimePaths';
 
 let databaseInstance: Database.Database | null = null;
 
@@ -33,20 +34,12 @@ function ensureDriveDiscImageColumn(database: Database.Database): void {
   }
 }
 
-function resolveDatabasePath(app: App): string {
-  if (app.isPackaged) {
-    return path.join(app.getPath('userData'), 'app.db');
-  }
-
-  return path.resolve(process.cwd(), '../../storage/app.db');
-}
-
 export function initializeDatabase(app: App): Database.Database {
   if (databaseInstance) {
     return databaseInstance;
   }
 
-  const databasePath = resolveDatabasePath(app);
+  const databasePath = getDatabasePath();
   fs.mkdirSync(path.dirname(databasePath), { recursive: true });
 
   const database = new Database(databasePath);

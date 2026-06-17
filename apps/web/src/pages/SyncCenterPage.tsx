@@ -5,9 +5,11 @@ import {
   Card,
   Descriptions,
   Empty,
+  InputNumber,
   message,
   Space,
   Steps,
+  Switch,
   Table,
   Tag,
   Typography,
@@ -27,6 +29,7 @@ import {
   type UserFacingError,
 } from '@/lib/feedback';
 import {
+  getAutoSyncState,
   getRecentSyncLogs,
   getSyncOverview,
   retryFailedSyncSubtask,
@@ -35,9 +38,11 @@ import {
   runRealAgentsSync,
   runRealDriveDiscsSync,
   runRealWeaponsSync,
+  updateAutoSyncConfig,
 } from '@/services/syncService';
 import { useAppStore } from '@/store/appStore';
 import type {
+  AutoSyncState,
   DesktopAppInfo,
   RetrySyncSubtaskResult,
   RetryableSyncTaskName,
@@ -107,6 +112,22 @@ function syncTaskLabel(taskName: string) {
   }
 
   return taskName;
+}
+
+function triggerModeLabel(triggerMode?: string | null) {
+  if (triggerMode === 'automatic') {
+    return '自动';
+  }
+
+  if (triggerMode === 'retry') {
+    return '重试';
+  }
+
+  if (triggerMode === 'manual') {
+    return '手动';
+  }
+
+  return '--';
 }
 
 function formatAggregateSummary(result: RunSyncTaskResult | null) {
@@ -229,6 +250,13 @@ const columns: ColumnsType<SyncLogSummary> = [
     render: (target: string | null) => target ?? '--',
   },
   {
+    title: '触发方式',
+    dataIndex: 'triggerMode',
+    key: 'triggerMode',
+    width: 100,
+    render: (triggerMode?: string | null) => triggerModeLabel(triggerMode),
+  },
+  {
     title: '开始时间',
     dataIndex: 'startedAt',
     key: 'startedAt',
@@ -259,6 +287,7 @@ export function SyncCenterPage() {
   const setActiveSection = useAppStore((state) => state.setActiveSection);
   const [appInfo, setAppInfo] = useState<DesktopAppInfo | null>(null);
   const [overview, setOverview] = useState<SyncOverview | null>(null);
+  const [autoSyncState, setAutoSyncState] = useState<AutoSyncState | null>(null);
   const [logs, setLogs] = useState<SyncLogSummary[]>([]);
   const [pageStatus, setPageStatus] = useState<AsyncStatus>('loading');
   const [pageError, setPageError] = useState<UserFacingError | null>(null);
@@ -268,6 +297,9 @@ export function SyncCenterPage() {
   const [syncStage, setSyncStage] = useState<SyncStage>('idle');
   const [retryRunningTask, setRetryRunningTask] = useState<RetryableSyncTaskName | null>(null);
   const [retryResult, setRetryResult] = useState<RetrySyncSubtaskResult | null>(null);
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState(false);
+  const [autoSyncIntervalHours, setAutoSyncIntervalHours] = useState(6);
+  const [autoSyncSaving, setAutoSyncSaving] = useState(false);
 
   useEffect(() => {
     setActiveSection('sync-center');
@@ -278,14 +310,16 @@ export function SyncCenterPage() {
     setPageError(null);
 
     try {
-      const [nextAppInfo, nextOverview, nextLogs] = await Promise.all([
+      const [nextAppInfo, nextOverview, nextAutoSyncState, nextLogs] = await Promise.all([
         getDesktopAppInfo(),
         getSyncOverview(),
+        getAutoSyncState(),
         getRecentSyncLogs(10),
       ]);
 
       setAppInfo(nextAppInfo);
       setOverview(nextOverview);
+      setAutoSyncState(nextAutoSyncState);
       setLogs(nextLogs);
       setPageStatus('success');
     } catch (nextError) {
@@ -297,6 +331,15 @@ export function SyncCenterPage() {
   useEffect(() => {
     void loadSyncData();
   }, []);
+
+  useEffect(() => {
+    if (!autoSyncState) {
+      return;
+    }
+
+    setAutoSyncEnabled(autoSyncState.config.enabled);
+    setAutoSyncIntervalHours(autoSyncState.config.intervalHours);
+  }, [autoSyncState]);
 
   async function handleRunSync() {
     setSyncStage('preparing');
@@ -357,6 +400,22 @@ export function SyncCenterPage() {
     }
   }
 
+  async function handleSaveAutoSync() {
+    setAutoSyncSaving(true);
+
+    try {
+      const nextState = await updateAutoSyncConfig({
+        enabled: autoSyncEnabled,
+        intervalHours: autoSyncIntervalHours,
+      });
+      setAutoSyncState(nextState);
+      void message.success('自动同步配置已保存。');
+      await loadSyncData();
+    } finally {
+      setAutoSyncSaving(false);
+    }
+  }
+
   const latestLog = overview?.latestLog ?? null;
   const latestCatalogLog =
     logs.find((log) => log.taskName === 'sync_catalog' && log.summary) ??
@@ -367,6 +426,7 @@ export function SyncCenterPage() {
   const latestFailedTasks = latestLog?.summary?.failedTasks ?? [];
   const latestIncrementalSummary =
     latestLog?.summary?.incrementalSummary ?? latestLog?.incrementalSummary ?? null;
+  const latestAutoSyncLog = autoSyncState?.lastAutoSyncLog ?? null;
   const currentStage =
     syncRunning || syncStage === 'preparing'
       ? syncStage
@@ -376,8 +436,8 @@ export function SyncCenterPage() {
     <div className="page">
       <PageHeader
         title="同步中心"
-        subtitle="集中查看最近同步状态、历史日志和手动同步入口。当前保持单任务、手动触发的管理模式，不引入复杂调度。"
-        tags={['工具管理', 'SQLite 日志', '手动同步']}
+        subtitle="集中查看最近同步状态、历史日志、自动同步配置和手动同步入口。当前只提供应用运行期间有效的最小定时能力。"
+        tags={['工具管理', 'SQLite 日志', '自动同步']}
       />
 
       <SectionCard
@@ -430,7 +490,6 @@ export function SyncCenterPage() {
                 ? `正在执行 ${syncTaskLabel(activeSyncTask)}`
                 : `执行${syncTaskLabel(activeSyncTask)}同步`}
             </Button>
-            <Button disabled>自动定时（预留）</Button>
           </Space>
         }
       >
@@ -497,6 +556,59 @@ export function SyncCenterPage() {
               ) : (
                 <Text type="secondary">最近一次统一同步没有可重试的失败子任务。</Text>
               )}
+            </Card>
+
+            <Card bordered={false} className="panel sync-summary-card" style={{ marginBottom: 16 }}>
+              <Text className="sync-summary-card__label">自动同步</Text>
+              <Space wrap style={{ marginBottom: 12 }}>
+                <Text>启用</Text>
+                <Switch
+                  checked={autoSyncEnabled}
+                  disabled={!bridgeConnected || autoSyncSaving}
+                  onChange={setAutoSyncEnabled}
+                />
+                <Text>间隔（小时）</Text>
+                <InputNumber
+                  min={1}
+                  max={168}
+                  value={autoSyncIntervalHours}
+                  disabled={!bridgeConnected || autoSyncSaving}
+                  onChange={(value) => setAutoSyncIntervalHours(value ?? 1)}
+                />
+                <Button
+                  type="primary"
+                  disabled={!bridgeConnected}
+                  loading={autoSyncSaving}
+                  onClick={() => void handleSaveAutoSync()}
+                >
+                  保存自动同步
+                </Button>
+              </Space>
+              <Descriptions bordered size="small" column={2}>
+                <Descriptions.Item label="自动同步状态">
+                  {autoSyncState?.config.enabled ? '已开启' : '未开启'}
+                </Descriptions.Item>
+                <Descriptions.Item label="当前间隔">
+                  {autoSyncState ? `${autoSyncState.config.intervalHours} 小时` : '--'}
+                </Descriptions.Item>
+                <Descriptions.Item label="下次预计执行时间">
+                  {autoSyncState?.nextRunAt ?? '--'}
+                </Descriptions.Item>
+                <Descriptions.Item label="最近一次调度时间">
+                  {autoSyncState?.lastScheduledAt ?? '--'}
+                </Descriptions.Item>
+                <Descriptions.Item label="调度运行状态">
+                  {autoSyncState?.isRunning ? '执行中' : '待命'}
+                </Descriptions.Item>
+                <Descriptions.Item label="最近一次自动同步结果">
+                  {latestAutoSyncLog
+                    ? `${statusLabel(latestAutoSyncLog.status)} / ${formatIncrementalSummary(
+                        latestAutoSyncLog.summary?.incrementalSummary ??
+                          latestAutoSyncLog.incrementalSummary,
+                      )}`
+                    : '--'}
+                </Descriptions.Item>
+              </Descriptions>
             </Card>
 
             <Card bordered={false} className="panel sync-stage-card">
@@ -616,6 +728,9 @@ export function SyncCenterPage() {
                 <div className="sync-log-details">
                   <Descriptions bordered size="small" column={2}>
                     <Descriptions.Item label="来源任务">{record.sourceName ?? '--'}</Descriptions.Item>
+                    <Descriptions.Item label="触发方式">
+                      {triggerModeLabel(record.triggerMode)}
+                    </Descriptions.Item>
                     <Descriptions.Item label="错误码">{record.errorCode ?? '--'}</Descriptions.Item>
                     <Descriptions.Item label="输出路径">{record.output ?? '--'}</Descriptions.Item>
                     <Descriptions.Item label="记录数">{record.recordCount ?? '--'}</Descriptions.Item>

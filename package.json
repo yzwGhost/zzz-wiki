@@ -6,7 +6,10 @@
   "scripts": {
     "desktop:repair": "pnpm --filter @zzz/desktop repair-runtime",
     "dev": "concurrently -k \"pnpm --filter @zzz/web dev\" \"pnpm --filter @zzz/desktop dev\"",
-    "build": "pnpm --filter @zzz/web build && pnpm --filter @zzz/desktop build"
+    "build": "pnpm --filter @zzz/web build && pnpm --filter @zzz/desktop build",
+    "package:win": "pnpm --filter @zzz/web build && pnpm --filter @zzz/desktop build && pnpm --filter @zzz/desktop dist:win",
+    "package:win:installer": "pnpm --filter @zzz/web build && pnpm --filter @zzz/desktop build && pnpm --filter @zzz/desktop dist:win:installer",
+    "package:win:repair": "pnpm --filter @zzz/desktop repair-runtime && pnpm package:win"
   },
   "pnpm": {
     "onlyBuiltDependencies": ["electron", "esbuild", "better-sqlite3"]

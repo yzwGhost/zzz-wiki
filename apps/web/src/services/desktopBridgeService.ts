@@ -20,6 +20,8 @@ import type {
   WeaponListFilters,
 } from '@shared/schemas/catalog';
 import type {
+  AutoSyncConfig,
+  AutoSyncState,
   DesktopApi,
   DesktopAppInfo,
   RetrySyncSubtaskRequest,
@@ -223,4 +225,39 @@ export async function getRecentSyncLogs(limit = 10): Promise<SyncLogSummary[]> {
   }
 
   return bridge.sync.getRecentLogs(limit);
+}
+
+export async function getAutoSyncState(): Promise<AutoSyncState> {
+  const bridge = getBridge();
+
+  if (!bridge) {
+    return {
+      config: {
+        enabled: false,
+        intervalHours: 6,
+      },
+      nextRunAt: null,
+      lastScheduledAt: null,
+      isRunning: false,
+      lastAutoSyncLog: null,
+    };
+  }
+
+  return bridge.sync.getAutoSyncState();
+}
+
+export async function updateAutoSyncConfig(config: AutoSyncConfig): Promise<AutoSyncState> {
+  const bridge = getBridge();
+
+  if (!bridge) {
+    return {
+      config,
+      nextRunAt: null,
+      lastScheduledAt: null,
+      isRunning: false,
+      lastAutoSyncLog: null,
+    };
+  }
+
+  return bridge.sync.updateAutoSyncConfig(config);
 }

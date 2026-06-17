@@ -106,6 +106,7 @@ class TaskRunResult:
     message: str
     raw_records: list[RawCatalogRecord]
     records: list[CatalogRecord]
+    trigger_mode: str = "manual"
     incremental_summary: IncrementalSyncSummary | None = None
 
     @property
@@ -119,6 +120,7 @@ class TaskRunResult:
         return {
             "task_name": self.task_name,
             "source_name": self.source_name,
+            "trigger_mode": self.trigger_mode,
             "status": self.status,
             "started_at": self.started_at,
             "finished_at": self.finished_at,

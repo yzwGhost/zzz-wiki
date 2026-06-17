@@ -124,6 +124,18 @@ function createAggregateLogMessage(summary: SyncTaskAggregateSummary): string {
     : `统一资料同步完成，${successCount} 个子任务全部成功；新增 ${summary.incrementalSummary.created}，更新 ${summary.incrementalSummary.updated}，无变化 ${summary.incrementalSummary.unchanged}。`;
 }
 
+function resolveSourceName(triggerMode: RunSyncTaskRequest['triggerMode']): string {
+  if (triggerMode === 'automatic') {
+    return 'sync.catalog.auto';
+  }
+
+  if (triggerMode === 'retry') {
+    return 'sync.catalog.retry';
+  }
+
+  return 'sync.catalog.manual';
+}
+
 export const syncCatalogTaskService = {
   async run(request: RunSyncTaskRequest): Promise<RunSyncTaskResult> {
     const startedAt = new Date().toISOString();
@@ -137,6 +149,7 @@ export const syncCatalogTaskService = {
       const childResult = await pythonTaskService.runTask({
         taskName,
         target: request.target,
+        triggerMode: request.triggerMode,
       });
       const childFinishedAt = new Date().toISOString();
 
@@ -157,6 +170,7 @@ export const syncCatalogTaskService = {
           ok: false,
           taskName: request.taskName,
           target: request.target,
+          triggerMode: request.triggerMode ?? 'manual',
           errorCode: 'SUBTASK_FAILED',
           errorMessage: `统一资料同步失败，子任务 ${childResult.taskName} 执行失败。`,
           stdout: stdoutBlocks.join('\n\n'),
@@ -181,6 +195,7 @@ export const syncCatalogTaskService = {
             errorCode: failureResult.errorCode,
             stdout: failureResult.stdout,
             stderr: failureResult.stderr,
+            triggerMode: failureResult.triggerMode,
             summary,
             incrementalSummary: summary.incrementalSummary,
           }),
@@ -196,6 +211,7 @@ export const syncCatalogTaskService = {
       ok: true,
       taskName: request.taskName,
       target: request.target,
+      triggerMode: request.triggerMode ?? 'manual',
       output: 'catalog:agents,weapons,drive-discs',
       status: summary.overallStatus,
       recordCount: totalRecordCount,
@@ -204,7 +220,7 @@ export const syncCatalogTaskService = {
       startedAt,
       finishedAt,
       message: createAggregateLogMessage(summary),
-      sourceName: 'catalog.sync',
+      sourceName: resolveSourceName(request.triggerMode),
       summary,
       incrementalSummary: summary.incrementalSummary,
     };
@@ -221,6 +237,7 @@ export const syncCatalogTaskService = {
         recordCount: successResult.recordCount,
         stdout: successResult.stdout,
         stderr: successResult.stderr,
+        triggerMode: successResult.triggerMode,
         sourceName: successResult.sourceName,
         summary,
         incrementalSummary: successResult.incrementalSummary,

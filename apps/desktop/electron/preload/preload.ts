@@ -42,6 +42,12 @@ const api: DesktopApi = {
     getRecentLogs(limit) {
       return ipcRenderer.invoke(IPC_CHANNELS.sync.getRecentLogs, limit);
     },
+    getAutoSyncState() {
+      return ipcRenderer.invoke(IPC_CHANNELS.sync.getAutoSyncState);
+    },
+    updateAutoSyncConfig(config) {
+      return ipcRenderer.invoke(IPC_CHANNELS.sync.updateAutoSyncConfig, config);
+    },
   },
 };
 

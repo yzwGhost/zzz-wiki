@@ -9,6 +9,7 @@ import type {
   SyncTaskTarget,
 } from '../../../../../shared/schemas/desktop';
 import { syncLogRepository } from '../repositories/syncLogRepository';
+import { getCrawlerEnvironment, getCrawlerRootPath } from '../utils/runtimePaths';
 
 const execFileAsync = promisify(execFile);
 
@@ -30,7 +31,7 @@ interface RunTaskOptions {
 }
 
 function getCrawlerDirectory() {
-  return path.resolve(process.cwd(), '../../services/crawler');
+  return getCrawlerRootPath();
 }
 
 function getPythonCandidates(): PythonCommandCandidate[] {
@@ -51,7 +52,14 @@ function getPythonCandidates(): PythonCommandCandidate[] {
 }
 
 function getTaskArgs(request: RunSyncTaskRequest) {
-  return [...['-m', 'src.cli'], request.taskName, '--target', request.target];
+  return [
+    ...['-m', 'src.cli'],
+    request.taskName,
+    '--target',
+    request.target,
+    '--trigger-mode',
+    request.triggerMode ?? 'manual',
+  ];
 }
 
 function createFailureResult(
@@ -66,6 +74,7 @@ function createFailureResult(
     ok: false,
     taskName: request.taskName,
     target: request.target,
+    triggerMode: request.triggerMode ?? 'manual',
     errorCode,
     errorMessage,
     stdout,
@@ -160,6 +169,7 @@ function parseSuccessResult(
       ok: true,
       taskName: request.taskName,
       target: request.target,
+      triggerMode: request.triggerMode ?? 'manual',
       output: payload.output,
       status: payload.status,
       recordCount: payload.record_count,
@@ -195,6 +205,7 @@ async function executeWithCandidate(
       cwd: getCrawlerDirectory(),
       encoding: 'utf8',
       windowsHide: true,
+      env: getCrawlerEnvironment(),
     });
     const finishedAt = new Date().toISOString();
 

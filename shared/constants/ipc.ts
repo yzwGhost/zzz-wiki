@@ -7,6 +7,8 @@ export const IPC_CHANNELS = {
     retrySubtask: 'sync:retry-subtask',
     getOverview: 'sync:get-overview',
     getRecentLogs: 'sync:get-recent-logs',
+    getAutoSyncState: 'sync:get-auto-sync-state',
+    updateAutoSyncConfig: 'sync:update-auto-sync-config',
   },
   catalog: {
     getOverview: 'catalog:get-overview',

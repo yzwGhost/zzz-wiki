@@ -8,7 +8,9 @@
     "repair-sqlite": "node scripts/ensure-better-sqlite3.cjs",
     "repair-runtime": "node scripts/ensure-electron.cjs && node scripts/ensure-better-sqlite3.cjs",
     "dev": "node scripts/ensure-electron.cjs && node scripts/ensure-better-sqlite3.cjs && concurrently -k \"tsc -p tsconfig.json -w\" \"wait-on dist/apps/desktop/electron/main/main.js && electron .\"",
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "dist:win": "electron-builder --win dir --config electron-builder.json",
+    "dist:win:installer": "electron-builder --win nsis --config electron-builder.json"
   },
   "devDependencies": {
     "@electron/rebuild": "^3.7.1",
@@ -16,6 +18,7 @@
     "@types/node": "^22.15.30",
     "concurrently": "^9.1.2",
     "electron": "^36.4.0",
+    "electron-builder": "^26.0.12",
     "typescript": "^5.8.3",
     "wait-on": "^8.0.3"
   },

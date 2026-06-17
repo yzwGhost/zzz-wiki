@@ -35,6 +35,7 @@
 
 - preload 受控桥接
 - Electron IPC 语义化通道
+- Windows `dir` 打包命令与最小发布验证文档
 - SQLite 最小 schema：
   - `agents`
   - `weapons`
@@ -70,14 +71,28 @@
 - 同步中心已兼容历史 `sync_logs` 中缺少 `retryableFailures` 等新字段的旧日志结构，避免页面因旧数据崩溃
 - 角色、音擎、驱动盘同步已支持最小增量判断，可区分新增 / 更新 / 无变化，并跳过无变化记录的重复写入
 - 单任务同步结果、统一同步结果和同步日志已带增量摘要，供同步中心直接展示
+- 已支持应用运行期间有效的最小自动定时同步，统一调用 `sync_catalog`
+- 自动同步配置已支持本地持久化，开发环境默认写入 `storage/auto-sync.json`，生产环境写入 Electron `userData`
+- 同步中心已支持查看和修改自动同步开关、间隔、下次预计执行时间，以及最近一次自动同步结果
+- 同步日志已支持区分手动 / 自动 / 重试三种触发方式
+- 打包态路径已收敛到统一运行时解析：
+  - `process.resourcesPath/web-dist`
+  - `process.resourcesPath/crawler`
+  - `app.getPath('userData')/app.db`
+  - `app.getPath('userData')/logs`
+  - `app.getPath('userData')/auto-sync.json`
+- `electron-builder` 已改为优先复用本地 `node_modules/electron/dist`
+  - 避免离线环境重复联网下载 Electron 二进制
+- Windows 打包验证文档已补齐：
+  - `docs/WINDOWS_PACKAGING_VALIDATION.md`
 
 ## 当前未完成
 
-- 自动定时同步
 - 配队页与材料页独立资料页
 - 资讯、版本、活动模块
 - 用户笔记与扩展字段
-- 桌面打包发布流程整理
+- Windows 代码签名与安装器整理
+- 在当前机器上直接双击 unsigned 打包 exe 的无障碍验证
 
 ## 当前推荐启动方式
 
@@ -100,9 +115,15 @@ D:\tools\nvm\v20.19.0\pnpm.CMD dev
 9. 即使 `sync_logs` 中存在旧版本聚合日志，同步中心页面也不会因缺少新字段而报错。
 10. 手动执行角色、音擎、驱动盘或统一同步后，同步中心可看到新增 / 更新 / 无变化 / 失败的增量摘要。
 11. 对已有条目重复执行同步时，无变化条目不会重复计入写入数。
+12. 在同步中心启用自动同步并保存后，可看到当前间隔、下次预计执行时间和最近一次自动同步结果。
+13. 自动同步执行后，最近日志中可通过“触发方式”区分自动、手动和重试。
+14. 可执行 `D:\tools\nvm\v20.19.0\pnpm.CMD package:win` 生成 `release/win/win-unpacked`。
+15. 打包前端资源、crawler 资源和 `dist/shared` 已进入 Windows 产物。
+16. 通过打包态路径诊断文件，可验证数据库、日志、配置和资料页 / 同步中心路由加载。
 
 ## 当前主要风险
 
 - `better-sqlite3` 依赖 Electron ABI，开发环境对 Node / Electron 版本较敏感。
 - 真实数据目前只覆盖角色、音擎、驱动盘的少量样本，尚未扩展到更大范围抓取。
 - OpenSpec 命令在某些非交互 shell 中不在 PATH，需要按本机环境补齐。
+- 当前机器的 Windows 应用控制策略会阻止直接启动新生成的 unsigned exe，需要在无策略限制环境做最终双击验收。

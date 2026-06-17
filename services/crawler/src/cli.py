@@ -48,6 +48,12 @@ def build_parser() -> argparse.ArgumentParser:
         default="json",
         help="Export target for processed task results.",
     )
+    parser.add_argument(
+        "--trigger-mode",
+        choices=["manual", "automatic", "retry"],
+        default="manual",
+        help="Trigger source for sync logging.",
+    )
     return parser
 
 
@@ -67,6 +73,7 @@ def main() -> int:
     try:
         task_runner = TASK_REGISTRY[args.task]
         result = task_runner()
+        result.trigger_mode = args.trigger_mode
         exporter = resolve_exporter(args.target)
         output_path = exporter.export(result)
     except CrawlerError as error:

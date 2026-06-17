@@ -1,0 +1,50 @@
+{
+  "appId": "com.yzwghost.zzz-wiki",
+  "productName": "绝区零攻略站",
+  "asar": true,
+  "npmRebuild": false,
+  "buildDependenciesFromSource": false,
+  "electronDist": "node_modules/electron/dist",
+  "directories": {
+    "output": "../../release/win"
+  },
+  "files": [
+    "dist/apps/desktop/**/*",
+    "dist/shared/**/*",
+    "package.json",
+    "node_modules/**/*"
+  ],
+  "extraResources": [
+    {
+      "from": "../web/dist",
+      "to": "web-dist"
+    },
+    {
+      "from": "../../services/crawler/src",
+      "to": "crawler/src"
+    },
+    {
+      "from": "../../services/crawler/pyproject.toml",
+      "to": "crawler/pyproject.toml"
+    },
+    {
+      "from": "../../services/crawler/requirements.txt",
+      "to": "crawler/requirements.txt"
+    }
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "dir",
+        "arch": [
+          "x64"
+        ]
+      }
+    ]
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "artifactName": "zzz-wiki-${version}-setup.${ext}"
+  }
+}
