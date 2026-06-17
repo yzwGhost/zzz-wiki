@@ -4,6 +4,7 @@ import { getDatabase } from '../db/client';
 import type {
   RunSyncTaskRequest,
   RunSyncTaskResult,
+  SyncTaskAggregateSummary,
   SyncLogSummary,
   SyncOverview,
 } from '../../../../../shared/schemas/desktop';
@@ -22,11 +23,14 @@ interface SyncPayloadShape {
   target?: 'json' | 'sqlite';
   output?: string;
   record_count?: number;
+  recordCount?: number;
   errorCode?: string;
   stdout?: string;
   stderr?: string;
   exitCode?: number;
   source_name?: string;
+  sourceName?: string;
+  summary?: SyncTaskAggregateSummary;
 }
 
 function parsePayload(payloadJson: string): SyncPayloadShape {
@@ -49,12 +53,18 @@ function mapRowToSummary(row: SyncLogRow): SyncLogSummary {
     message: row.message,
     target: payload.target ?? null,
     output: payload.output ?? null,
-    recordCount: typeof payload.record_count === 'number' ? payload.record_count : null,
+    recordCount:
+      typeof payload.record_count === 'number'
+        ? payload.record_count
+        : typeof payload.recordCount === 'number'
+          ? payload.recordCount
+          : null,
     errorCode: payload.errorCode ?? null,
     stdout: payload.stdout ?? null,
     stderr: payload.stderr ?? null,
     exitCode: typeof payload.exitCode === 'number' ? payload.exitCode : null,
-    sourceName: payload.source_name ?? null,
+    sourceName: payload.source_name ?? payload.sourceName ?? null,
+    summary: payload.summary ?? null,
   };
 }
 
@@ -78,6 +88,11 @@ export const syncLogRepository = {
       latestLog: latestRow ? mapRowToSummary(latestRow) : null,
       availableTasks: [
         {
+          taskName: 'sync_catalog',
+          label: '统一资料同步',
+          targets: ['sqlite', 'json'],
+        },
+        {
           taskName: 'bootstrap_agents',
           label: '角色样例同步',
           targets: ['sqlite', 'json'],
@@ -94,11 +109,31 @@ export const syncLogRepository = {
         },
         {
           taskName: 'fetch_mhy_drive_discs',
-          label: '绫冲搱娓搁┍鍔ㄧ洏鏍锋湰鍚屾',
+          label: '米哈游驱动盘样本同步',
           targets: ['sqlite', 'json'],
         },
       ],
     };
+  },
+
+  insertRunLog(payload: {
+    taskName: string;
+    status: 'success' | 'failed';
+    startedAt: string;
+    finishedAt: string;
+    message: string;
+    payloadJson: string;
+  }): void {
+    const database = getDatabase();
+    database.prepare(CATALOG_SQL.insertSyncLog).run({
+      id: `sync-${randomUUID()}`,
+      task_name: payload.taskName,
+      status: payload.status,
+      started_at: payload.startedAt,
+      finished_at: payload.finishedAt,
+      message: payload.message,
+      payload_json: payload.payloadJson,
+    });
   },
 
   insertFailedRun(request: RunSyncTaskRequest, result: RunSyncTaskResult): void {
@@ -106,19 +141,19 @@ export const syncLogRepository = {
       return;
     }
 
-    const database = getDatabase();
-    database.prepare(CATALOG_SQL.insertSyncLog).run({
-      id: `sync-${randomUUID()}`,
-      task_name: request.taskName,
+    this.insertRunLog({
+      taskName: request.taskName,
       status: 'failed',
-      started_at: new Date().toISOString(),
-      finished_at: new Date().toISOString(),
+      startedAt: result.startedAt ?? new Date().toISOString(),
+      finishedAt: result.finishedAt ?? new Date().toISOString(),
       message: result.errorMessage,
-      payload_json: JSON.stringify({
+      payloadJson: JSON.stringify({
         target: request.target,
         errorCode: result.errorCode,
         stdout: result.stdout,
         stderr: result.stderr,
+        exitCode: result.exitCode,
+        summary: result.summary ?? null,
       }),
     });
   },

@@ -29,6 +29,7 @@ import {
 import {
   getRecentSyncLogs,
   getSyncOverview,
+  runCatalogSync,
   runBootstrapAgentsSync,
   runRealAgentsSync,
   runRealDriveDiscsSync,
@@ -46,6 +47,7 @@ const { Paragraph, Text } = Typography;
 
 type SyncStage = 'idle' | 'preparing' | 'running' | 'success' | 'failed';
 type SyncTaskKey =
+  | 'sync_catalog'
   | 'bootstrap_agents'
   | 'fetch_mhy_agents'
   | 'fetch_mhy_weapons'
@@ -80,6 +82,10 @@ function statusLabel(status: string) {
 }
 
 function syncTaskLabel(taskName: string) {
+  if (taskName === 'sync_catalog') {
+    return '统一资料';
+  }
+
   if (taskName === 'fetch_mhy_agents') {
     return '真实角色样本';
   }
@@ -97,6 +103,23 @@ function syncTaskLabel(taskName: string) {
   }
 
   return taskName;
+}
+
+function formatAggregateSummary(result: RunSyncTaskResult | null) {
+  const summary = result?.summary;
+
+  if (!summary) {
+    return null;
+  }
+
+  return {
+    subtaskCount: summary.subtasks.length,
+    failedCount: summary.failedTasks.length,
+    failedLabel:
+      summary.failedTasks.length > 0
+        ? summary.failedTasks.map((taskName) => syncTaskLabel(taskName)).join('、')
+        : '无',
+  };
 }
 
 function toSyncStage(
@@ -215,8 +238,7 @@ export function SyncCenterPage() {
   const [logs, setLogs] = useState<SyncLogSummary[]>([]);
   const [pageStatus, setPageStatus] = useState<AsyncStatus>('loading');
   const [pageError, setPageError] = useState<UserFacingError | null>(null);
-  const [activeSyncTask, setActiveSyncTask] =
-    useState<SyncTaskKey>('fetch_mhy_drive_discs');
+  const [activeSyncTask, setActiveSyncTask] = useState<SyncTaskKey>('sync_catalog');
   const [syncRunning, setSyncRunning] = useState(false);
   const [syncResult, setSyncResult] = useState<RunSyncTaskResult | null>(null);
   const [syncStage, setSyncStage] = useState<SyncStage>('idle');
@@ -258,7 +280,9 @@ export function SyncCenterPage() {
     try {
       setSyncStage('running');
       const result =
-        activeSyncTask === 'fetch_mhy_agents'
+        activeSyncTask === 'sync_catalog'
+          ? await runCatalogSync()
+          : activeSyncTask === 'fetch_mhy_agents'
           ? await runRealAgentsSync()
           : activeSyncTask === 'fetch_mhy_weapons'
             ? await runRealWeaponsSync()
@@ -270,7 +294,13 @@ export function SyncCenterPage() {
       setSyncStage(result.ok ? 'success' : 'failed');
 
       if (result.ok) {
-        void message.success(`同步完成，已写入 ${result.recordCount} 条记录。`);
+        if (result.summary) {
+          void message.success(
+            `统一同步完成，已执行 ${result.summary.subtasks.length} 个子任务，共写入 ${result.recordCount} 条记录。`,
+          );
+        } else {
+          void message.success(`同步完成，已写入 ${result.recordCount} 条记录。`);
+        }
       } else {
         const syncError = createSyncFailureError(result);
         void message.error(syncError.title);
@@ -284,6 +314,7 @@ export function SyncCenterPage() {
 
   const latestLog = overview?.latestLog ?? null;
   const bridgeConnected = appInfo?.bridgeStatus === 'connected';
+  const aggregateSummary = formatAggregateSummary(syncResult);
   const currentStage =
     syncRunning || syncStage === 'preparing'
       ? syncStage
@@ -302,6 +333,13 @@ export function SyncCenterPage() {
         description="这里展示最新一次同步状态，以及后续失败重试和增量同步的扩展位。"
         extra={
           <Space wrap>
+            <Button
+              type={activeSyncTask === 'sync_catalog' ? 'primary' : 'default'}
+              disabled={syncRunning}
+              onClick={() => setActiveSyncTask('sync_catalog')}
+            >
+              统一资料同步
+            </Button>
             <Button
               type={activeSyncTask === 'fetch_mhy_drive_discs' ? 'primary' : 'default'}
               disabled={syncRunning}
@@ -377,6 +415,16 @@ export function SyncCenterPage() {
               </Card>
             </div>
 
+            {aggregateSummary ? (
+              <Card bordered={false} className="panel sync-summary-card" style={{ marginBottom: 16 }}>
+                <Text className="sync-summary-card__label">统一结果汇总</Text>
+                <Text className="sync-summary-card__value">
+                  子任务 {aggregateSummary.subtaskCount} 个 / 失败 {aggregateSummary.failedCount} 个
+                </Text>
+                <Text type="secondary">失败项：{aggregateSummary.failedLabel}</Text>
+              </Card>
+            ) : null}
+
             <Card bordered={false} className="panel sync-stage-card">
               <Text className="sync-summary-card__label">执行阶段</Text>
               <Steps
@@ -412,7 +460,9 @@ export function SyncCenterPage() {
                 message={syncResult.ok ? '同步执行成功' : '同步执行失败'}
                 description={
                   syncResult.ok
-                    ? `任务 ${syncResult.taskName} 已完成，写入 ${syncResult.recordCount} 条记录。`
+                    ? syncResult.summary
+                      ? `任务 ${syncResult.taskName} 已完成，执行 ${syncResult.summary.subtasks.length} 个子任务，写入 ${syncResult.recordCount} 条记录。`
+                      : `任务 ${syncResult.taskName} 已完成，写入 ${syncResult.recordCount} 条记录。`
                     : createSyncFailureError(syncResult).description
                 }
               />
@@ -435,6 +485,11 @@ export function SyncCenterPage() {
               <Descriptions.Item label="输出路径">{latestLog?.output ?? '--'}</Descriptions.Item>
               <Descriptions.Item label="记录数">{latestLog?.recordCount ?? '--'}</Descriptions.Item>
               <Descriptions.Item label="错误码">{latestLog?.errorCode ?? '--'}</Descriptions.Item>
+              <Descriptions.Item label="失败项摘要">
+                {latestLog?.summary?.failedTasks.length
+                  ? latestLog.summary.failedTasks.map((taskName) => syncTaskLabel(taskName)).join('、')
+                  : '--'}
+              </Descriptions.Item>
             </Descriptions>
 
             <div style={{ marginTop: 16 }}>
@@ -471,6 +526,17 @@ export function SyncCenterPage() {
                     <Descriptions.Item label="退出码">{record.exitCode ?? '--'}</Descriptions.Item>
                     <Descriptions.Item label="目标">{record.target ?? '--'}</Descriptions.Item>
                   </Descriptions>
+                  {record.summary ? (
+                    <Descriptions bordered size="small" column={1} style={{ marginTop: 12 }}>
+                      <Descriptions.Item label="统一同步摘要">
+                        {`总体状态：${statusLabel(record.summary.overallStatus)}；子任务数：${record.summary.subtasks.length}；失败项：${
+                          record.summary.failedTasks.length
+                            ? record.summary.failedTasks.map((taskName) => syncTaskLabel(taskName)).join('、')
+                            : '无'
+                        }`}
+                      </Descriptions.Item>
+                    </Descriptions>
+                  ) : null}
                   <div className="sync-log-details__streams">
                     <div className="sync-log-details__stream">
                       <Text className="sync-summary-card__label">STDOUT</Text>
@@ -489,7 +555,8 @@ export function SyncCenterPage() {
                     record.stderr?.trim() ||
                     record.errorCode ||
                     record.output ||
-                    record.sourceName,
+                    record.sourceName ||
+                    record.summary,
                 ),
             }}
             rowClassName={(record) => `sync-log-row sync-log-row--${record.status}`}

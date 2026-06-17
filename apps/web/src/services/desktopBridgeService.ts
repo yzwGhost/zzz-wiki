@@ -135,6 +135,7 @@ export async function runSyncTask(request: RunSyncTaskRequest): Promise<RunSyncT
       errorMessage: 'Electron bridge unavailable. Sync tasks can only run inside the desktop shell.',
       stdout: '',
       stderr: '',
+      summary: null,
     };
   }
 
@@ -148,6 +149,11 @@ export async function getSyncOverview(): Promise<SyncOverview> {
     return {
       latestLog: null,
       availableTasks: [
+        {
+          taskName: 'sync_catalog',
+          label: '统一资料同步',
+          targets: ['sqlite', 'json'],
+        },
         {
           taskName: 'bootstrap_agents',
           label: '角色样例同步',
@@ -165,7 +171,7 @@ export async function getSyncOverview(): Promise<SyncOverview> {
         },
         {
           taskName: 'fetch_mhy_drive_discs',
-          label: '绫冲搱娓搁┍鍔ㄧ洏鏍锋湰鍚屾',
+          label: '米哈游驱动盘样本同步',
           targets: ['sqlite', 'json'],
         },
       ],

@@ -16,6 +16,13 @@ export async function runBootstrapAgentsSync(): Promise<RunSyncTaskResult> {
   });
 }
 
+export async function runCatalogSync(): Promise<RunSyncTaskResult> {
+  return runSyncTaskFromBridge({
+    taskName: 'sync_catalog',
+    target: 'sqlite',
+  });
+}
+
 export async function getSyncOverview(): Promise<SyncOverview> {
   return getSyncOverviewFromBridge();
 }

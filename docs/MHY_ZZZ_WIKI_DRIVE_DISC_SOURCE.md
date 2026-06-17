@@ -42,6 +42,10 @@
 
 - 原始快照：`services/crawler/data/raw/fetch_mhy_drive_discs.json`
 - 标准化产物：`services/crawler/data/processed/fetch_mhy_drive_discs.json`
+- 2026-06-17 已验证执行：
+  - `python -m src.cli fetch_mhy_drive_discs --target json`
+  - `python -m src.cli fetch_mhy_drive_discs --target sqlite`
+- 当前验证样本数：`5`
 
 ## 当前数据流
 
@@ -61,4 +65,5 @@ miHoYo ZZZ Wiki JSON API
 - 本轮仅接入驱动盘
 - 当前只抓 3 到 5 个真实驱动盘样本
 - 推荐角色沿用项目内已接入的真实代理人 ID 体系，未命中的代理人不会阻塞驱动盘详情渲染
-- 当真实驱动盘样本快照不存在时，桌面端会回退到 mock 驱动盘数据
+- 当 Electron 桌面桥接不可用时，前端会回退到 `shared` 中的 mock 驱动盘数据
+- 当真实驱动盘样本快照不存在时，桌面端 seed 会回退到 mock 驱动盘数据

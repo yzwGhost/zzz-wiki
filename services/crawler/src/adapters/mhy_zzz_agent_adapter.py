@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import json
 import re
+import socket
+import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from html import unescape
 from html.parser import HTMLParser
 from typing import Any
 from urllib.parse import urlencode
+from urllib.error import URLError
 from urllib.request import Request, urlopen
 
 from src.adapters.base import SourceAdapter
@@ -86,10 +89,32 @@ def split_paragraphs(value: str) -> list[str]:
     return [paragraph for paragraph in re.split(r"</p>|<br\s*/?>", value) if paragraph.strip()]
 
 
-def parse_json_response(url: str, headers: dict[str, str]) -> dict[str, Any]:
-    request = Request(url, headers=headers, method="GET")
-    with urlopen(request, timeout=30) as response:
-        payload = json.loads(response.read().decode("utf-8"))
+def parse_json_response(
+    url: str,
+    headers: dict[str, str],
+    *,
+    timeout: int = 45,
+    retries: int = 3,
+    retry_delay: float = 1.0,
+) -> dict[str, Any]:
+    last_error: Exception | None = None
+
+    for attempt in range(1, retries + 1):
+        request = Request(url, headers=headers, method="GET")
+
+        try:
+            with urlopen(request, timeout=timeout) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+            break
+        except (TimeoutError, socket.timeout, URLError) as error:
+            last_error = error
+            if attempt == retries:
+                raise CrawlerError(
+                    f"miHoYo wiki request timed out after {retries} attempts: {url}"
+                ) from error
+            time.sleep(retry_delay * attempt)
+    else:  # pragma: no cover - defensive loop guard
+        raise CrawlerError(f"miHoYo wiki request failed without a response: {url}") from last_error
 
     retcode = payload.get("retcode")
     if retcode not in (0, None):

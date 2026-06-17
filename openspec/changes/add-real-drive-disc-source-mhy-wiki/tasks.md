@@ -17,4 +17,4 @@
 ## 4. Verification And Documentation
 
 - [x] 4.1 Add a source note describing the drive-disc first-source structure and the current ingestion path
-- [ ] 4.2 Validate the OpenSpec change and run the affected verification commands
+- [x] 4.2 Validate the OpenSpec change and run the affected verification commands

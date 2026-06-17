@@ -31,6 +31,7 @@ export interface DesktopCatalogApi {
 }
 
 export type SyncTaskName =
+  | 'sync_catalog'
   | 'bootstrap_agents'
   | 'fetch_mhy_agents'
   | 'fetch_mhy_weapons'
@@ -43,6 +44,26 @@ export interface RunSyncTaskRequest {
   target: SyncTaskTarget;
 }
 
+export interface SyncSubtaskSummary {
+  taskName: SyncTaskName;
+  status: 'success' | 'failed';
+  startedAt: string;
+  finishedAt: string;
+  target: SyncTaskTarget;
+  message: string;
+  recordCount: number;
+  output: string | null;
+  errorCode: string | null;
+}
+
+export interface SyncTaskAggregateSummary {
+  overallStatus: 'success' | 'failed';
+  startedAt: string;
+  finishedAt: string;
+  failedTasks: string[];
+  subtasks: SyncSubtaskSummary[];
+}
+
 export interface SyncTaskSuccessResult {
   ok: true;
   taskName: SyncTaskName;
@@ -52,6 +73,11 @@ export interface SyncTaskSuccessResult {
   recordCount: number;
   stdout: string;
   stderr: string;
+  startedAt?: string;
+  finishedAt?: string;
+  message?: string;
+  sourceName?: string;
+  summary?: SyncTaskAggregateSummary | null;
 }
 
 export interface SyncTaskFailureResult {
@@ -63,6 +89,13 @@ export interface SyncTaskFailureResult {
   stdout: string;
   stderr: string;
   exitCode?: number;
+  startedAt?: string;
+  finishedAt?: string;
+  message?: string;
+  sourceName?: string;
+  recordCount?: number;
+  output?: string;
+  summary?: SyncTaskAggregateSummary | null;
 }
 
 export type RunSyncTaskResult = SyncTaskSuccessResult | SyncTaskFailureResult;
@@ -82,6 +115,7 @@ export interface SyncLogSummary {
   stderr?: string | null;
   exitCode?: number | null;
   sourceName?: string | null;
+  summary?: SyncTaskAggregateSummary | null;
 }
 
 export interface SyncOverview {
