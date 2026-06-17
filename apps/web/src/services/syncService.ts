@@ -1,4 +1,5 @@
 import type {
+  RetrySyncSubtaskResult,
   RunSyncTaskResult,
   SyncLogSummary,
   SyncOverview,
@@ -6,6 +7,7 @@ import type {
 import {
   getRecentSyncLogs as getRecentSyncLogsFromBridge,
   getSyncOverview as getSyncOverviewFromBridge,
+  retrySyncSubtask as retrySyncSubtaskFromBridge,
   runSyncTask as runSyncTaskFromBridge,
 } from '@/services/desktopBridgeService';
 
@@ -49,5 +51,14 @@ export async function runRealDriveDiscsSync(): Promise<RunSyncTaskResult> {
   return runSyncTaskFromBridge({
     taskName: 'fetch_mhy_drive_discs',
     target: 'sqlite',
+  });
+}
+
+export async function retryFailedSyncSubtask(taskName: 'fetch_mhy_agents' | 'fetch_mhy_weapons' | 'fetch_mhy_drive_discs', sourceLogId: string | null): Promise<RetrySyncSubtaskResult> {
+  return retrySyncSubtaskFromBridge({
+    taskName,
+    target: 'sqlite',
+    sourceLogId,
+    sourceTaskName: 'sync_catalog',
   });
 }

@@ -1,6 +1,8 @@
 import type {
   RunSyncTaskRequest,
   RunSyncTaskResult,
+  RetryableSyncSubtask,
+  SyncIncrementalSummary,
   SyncSubtaskSummary,
   SyncTaskAggregateSummary,
 } from '../../../../../shared/schemas/desktop';
@@ -12,6 +14,38 @@ const CATALOG_SUBTASKS: RunSyncTaskRequest['taskName'][] = [
   'fetch_mhy_weapons',
   'fetch_mhy_drive_discs',
 ];
+
+function createEmptyIncrementalSummary(): SyncIncrementalSummary {
+  return {
+    created: 0,
+    updated: 0,
+    unchanged: 0,
+    failed: 0,
+    writtenCount: 0,
+    totalCount: 0,
+  };
+}
+
+function normalizeIncrementalSummary(
+  summary: SyncIncrementalSummary | null | undefined,
+): SyncIncrementalSummary {
+  if (!summary) {
+    return createEmptyIncrementalSummary();
+  }
+
+  return {
+    created: summary.created,
+    updated: summary.updated,
+    unchanged: summary.unchanged,
+    failed: summary.failed,
+    writtenCount: summary.writtenCount,
+    totalCount: summary.totalCount,
+  };
+}
+
+function isRetryableCatalogTask(taskName: RunSyncTaskRequest['taskName']): taskName is RetryableSyncSubtask['taskName'] {
+  return taskName === 'fetch_mhy_agents' || taskName === 'fetch_mhy_weapons' || taskName === 'fetch_mhy_drive_discs';
+}
 
 function createSubtaskSummary(
   result: RunSyncTaskResult,
@@ -28,6 +62,14 @@ function createSubtaskSummary(
     recordCount: result.ok ? result.recordCount : result.recordCount ?? 0,
     output: result.ok ? result.output : result.output ?? null,
     errorCode: result.ok ? null : result.errorCode,
+    retryable: !result.ok && isRetryableCatalogTask(result.taskName),
+    incrementalSummary: result.ok
+      ? normalizeIncrementalSummary(result.incrementalSummary)
+      : {
+          ...createEmptyIncrementalSummary(),
+          failed: 1,
+          totalCount: 1,
+        },
   };
 }
 
@@ -39,6 +81,28 @@ function buildAggregateSummary(
   const failedTasks = subtasks
     .filter((task) => task.status === 'failed')
     .map((task) => task.taskName);
+  const retryableFailures: RetryableSyncSubtask[] = subtasks
+    .filter(
+      (task): task is SyncSubtaskSummary & { taskName: RetryableSyncSubtask['taskName'] } =>
+        task.status === 'failed' && Boolean(task.retryable) && isRetryableCatalogTask(task.taskName),
+    )
+    .map((task) => ({
+      taskName: task.taskName,
+      target: task.target,
+      reason: task.message,
+      canRetry: true,
+    }));
+  const incrementalSummary = subtasks.reduce<SyncIncrementalSummary>(
+    (aggregate, task) => ({
+      created: aggregate.created + task.incrementalSummary.created,
+      updated: aggregate.updated + task.incrementalSummary.updated,
+      unchanged: aggregate.unchanged + task.incrementalSummary.unchanged,
+      failed: aggregate.failed + task.incrementalSummary.failed,
+      writtenCount: aggregate.writtenCount + task.incrementalSummary.writtenCount,
+      totalCount: aggregate.totalCount + task.incrementalSummary.totalCount,
+    }),
+    createEmptyIncrementalSummary(),
+  );
 
   return {
     overallStatus: failedTasks.length ? 'failed' : 'success',
@@ -46,6 +110,8 @@ function buildAggregateSummary(
     finishedAt,
     failedTasks,
     subtasks,
+    retryableFailures,
+    incrementalSummary,
   };
 }
 
@@ -54,8 +120,8 @@ function createAggregateLogMessage(summary: SyncTaskAggregateSummary): string {
   const failedCount = summary.failedTasks.length;
 
   return failedCount
-    ? `统一资料同步完成，${successCount} 个子任务成功，${failedCount} 个子任务失败。`
-    : `统一资料同步完成，${successCount} 个子任务全部成功。`;
+    ? `统一资料同步完成，${successCount} 个子任务成功，${failedCount} 个子任务失败；新增 ${summary.incrementalSummary.created}，更新 ${summary.incrementalSummary.updated}，无变化 ${summary.incrementalSummary.unchanged}。`
+    : `统一资料同步完成，${successCount} 个子任务全部成功；新增 ${summary.incrementalSummary.created}，更新 ${summary.incrementalSummary.updated}，无变化 ${summary.incrementalSummary.unchanged}。`;
 }
 
 export const syncCatalogTaskService = {
@@ -100,6 +166,7 @@ export const syncCatalogTaskService = {
           message: createAggregateLogMessage(summary),
           recordCount: totalRecordCount,
           summary,
+          incrementalSummary: summary.incrementalSummary,
         };
 
         syncLogRepository.insertRunLog({
@@ -115,6 +182,7 @@ export const syncCatalogTaskService = {
             stdout: failureResult.stdout,
             stderr: failureResult.stderr,
             summary,
+            incrementalSummary: summary.incrementalSummary,
           }),
         });
 
@@ -138,6 +206,7 @@ export const syncCatalogTaskService = {
       message: createAggregateLogMessage(summary),
       sourceName: 'catalog.sync',
       summary,
+      incrementalSummary: summary.incrementalSummary,
     };
 
     syncLogRepository.insertRunLog({
@@ -154,6 +223,7 @@ export const syncCatalogTaskService = {
         stderr: successResult.stderr,
         sourceName: successResult.sourceName,
         summary,
+        incrementalSummary: successResult.incrementalSummary,
       }),
     });
 

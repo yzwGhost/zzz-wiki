@@ -86,7 +86,10 @@ def main() -> int:
                 "target": args.target,
                 "output": output_path,
                 "status": result.status,
-                "record_count": len(result.records),
+                "record_count": result.record_count,
+                "incremental_summary": result.incremental_summary.to_dict()
+                if result.incremental_summary is not None
+                else None,
             },
             ensure_ascii=False,
         )

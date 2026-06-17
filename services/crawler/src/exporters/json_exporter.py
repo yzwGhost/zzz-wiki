@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 from src.exporters.base import Exporter
-from src.models.records import TaskRunResult
+from src.models.records import IncrementalSyncSummary, TaskRunResult
 from src.utils.paths import get_processed_path, get_raw_path
 
 
@@ -11,6 +11,14 @@ class JsonExporter(Exporter):
     target_name = "json"
 
     def export(self, result: TaskRunResult) -> str:
+        if result.incremental_summary is None:
+            result.incremental_summary = IncrementalSyncSummary(
+                created=len(result.records),
+                updated=0,
+                unchanged=0,
+                failed=0,
+            )
+
         raw_path = get_raw_path(f"{result.task_name}.json")
         processed_path = get_processed_path(f"{result.task_name}.json")
 

@@ -22,6 +22,8 @@ import type {
 import type {
   DesktopApi,
   DesktopAppInfo,
+  RetrySyncSubtaskRequest,
+  RetrySyncSubtaskResult,
   RunSyncTaskRequest,
   RunSyncTaskResult,
   SyncLogSummary,
@@ -140,6 +142,38 @@ export async function runSyncTask(request: RunSyncTaskRequest): Promise<RunSyncT
   }
 
   return bridge.sync.runTask(request);
+}
+
+export async function retrySyncSubtask(
+  request: RetrySyncSubtaskRequest,
+): Promise<RetrySyncSubtaskResult> {
+  const bridge = getBridge();
+
+  if (!bridge) {
+    return {
+      original: {
+        taskName: request.taskName,
+        target: request.target,
+        reason: 'Electron bridge unavailable.',
+        canRetry: true,
+        sourceLogId: request.sourceLogId,
+        sourceTaskName: request.sourceTaskName,
+      },
+      retry: {
+        ok: false,
+        taskName: request.taskName,
+        target: request.target,
+        errorCode: 'BRIDGE_UNAVAILABLE',
+        errorMessage: 'Electron bridge unavailable. Retry can only run inside the desktop shell.',
+        stdout: '',
+        stderr: '',
+        summary: null,
+      },
+      retriedAt: new Date().toISOString(),
+    };
+  }
+
+  return bridge.sync.retrySubtask(request);
 }
 
 export async function getSyncOverview(): Promise<SyncOverview> {

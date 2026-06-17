@@ -4,6 +4,7 @@ import { promisify } from 'node:util';
 import type {
   RunSyncTaskRequest,
   RunSyncTaskResult,
+  SyncIncrementalSummary,
   SyncTaskName,
   SyncTaskTarget,
 } from '../../../../../shared/schemas/desktop';
@@ -22,6 +23,10 @@ const ALLOWED_TARGETS = new Set<SyncTaskTarget>(['json', 'sqlite']);
 interface PythonCommandCandidate {
   command: string;
   prefixArgs: string[];
+}
+
+interface RunTaskOptions {
+  skipFailureLog?: boolean;
 }
 
 function getCrawlerDirectory() {
@@ -69,10 +74,55 @@ function createFailureResult(
   };
 }
 
+function normalizeIncrementalSummary(
+  summary: Partial<{
+    created: number;
+    updated: number;
+    unchanged: number;
+    failed: number;
+    written_count: number;
+    writtenCount: number;
+    total_count: number;
+    totalCount: number;
+  }> | null | undefined,
+): SyncIncrementalSummary | null {
+  if (!summary) {
+    return null;
+  }
+
+  const created = typeof summary.created === 'number' ? summary.created : 0;
+  const updated = typeof summary.updated === 'number' ? summary.updated : 0;
+  const unchanged = typeof summary.unchanged === 'number' ? summary.unchanged : 0;
+  const failed = typeof summary.failed === 'number' ? summary.failed : 0;
+  const writtenCount =
+    typeof summary.writtenCount === 'number'
+      ? summary.writtenCount
+      : typeof summary.written_count === 'number'
+        ? summary.written_count
+        : created + updated;
+  const totalCount =
+    typeof summary.totalCount === 'number'
+      ? summary.totalCount
+      : typeof summary.total_count === 'number'
+        ? summary.total_count
+        : created + updated + unchanged + failed;
+
+  return {
+    created,
+    updated,
+    unchanged,
+    failed,
+    writtenCount,
+    totalCount,
+  };
+}
+
 function parseSuccessResult(
   request: RunSyncTaskRequest,
   stdout: string,
   stderr: string,
+  startedAt: string,
+  finishedAt: string,
 ): RunSyncTaskResult {
   const lines = stdout
     .split(/\r?\n/u)
@@ -95,7 +145,16 @@ function parseSuccessResult(
       output: string;
       status: string;
       record_count: number;
+      incremental_summary?: {
+        created?: number;
+        updated?: number;
+        unchanged?: number;
+        failed?: number;
+        written_count?: number;
+        total_count?: number;
+      } | null;
     };
+    const incrementalSummary = normalizeIncrementalSummary(payload.incremental_summary);
 
     return {
       ok: true,
@@ -106,6 +165,12 @@ function parseSuccessResult(
       recordCount: payload.record_count,
       stdout,
       stderr,
+      startedAt,
+      finishedAt,
+      message: `任务 ${request.taskName} 已完成。`,
+      sourceName: request.taskName,
+      summary: null,
+      incrementalSummary,
     };
   } catch {
     return createFailureResult(
@@ -123,6 +188,7 @@ async function executeWithCandidate(
   request: RunSyncTaskRequest,
 ): Promise<RunSyncTaskResult> {
   const args = [...candidate.prefixArgs, ...getTaskArgs(request)];
+  const startedAt = new Date().toISOString();
 
   try {
     const { stdout, stderr } = await execFileAsync(candidate.command, args, {
@@ -130,39 +196,52 @@ async function executeWithCandidate(
       encoding: 'utf8',
       windowsHide: true,
     });
+    const finishedAt = new Date().toISOString();
 
-    return parseSuccessResult(request, stdout, stderr);
+    return parseSuccessResult(request, stdout, stderr, startedAt, finishedAt);
   } catch (error) {
     const executionError = error as NodeJS.ErrnoException & {
       code?: string | number;
       stdout?: string;
       stderr?: string;
     };
+    const finishedAt = new Date().toISOString();
 
     if (executionError.code === 'ENOENT') {
       throw executionError;
     }
 
-    return createFailureResult(
+    return {
+      ...createFailureResult(
       request,
       'PROCESS_FAILED',
       executionError.message,
       executionError.stdout ?? '',
       executionError.stderr ?? '',
       typeof executionError.code === 'number' ? executionError.code : undefined,
-    );
+      ),
+      startedAt,
+      finishedAt,
+      message: `任务 ${request.taskName} 执行失败。`,
+      summary: null,
+    };
   }
 }
 
 export const pythonTaskService = {
-  async runTask(request: RunSyncTaskRequest): Promise<RunSyncTaskResult> {
+  async runTask(
+    request: RunSyncTaskRequest,
+    options: RunTaskOptions = {},
+  ): Promise<RunSyncTaskResult> {
     if (!ALLOWED_TASKS.has(request.taskName)) {
       const result = createFailureResult(
         request,
         'UNSUPPORTED_TASK',
         `Unsupported sync task: ${request.taskName}`,
       );
-      syncLogRepository.insertFailedRun(request, result);
+      if (!options.skipFailureLog) {
+        syncLogRepository.insertFailedRun(request, result);
+      }
       return result;
     }
 
@@ -172,7 +251,9 @@ export const pythonTaskService = {
         'UNSUPPORTED_TARGET',
         `Unsupported sync target: ${request.target}`,
       );
-      syncLogRepository.insertFailedRun(request, result);
+      if (!options.skipFailureLog) {
+        syncLogRepository.insertFailedRun(request, result);
+      }
       return result;
     }
 
@@ -183,7 +264,9 @@ export const pythonTaskService = {
       try {
         const result = await executeWithCandidate(candidate, request);
         if (!result.ok) {
-          syncLogRepository.insertFailedRun(request, result);
+          if (!options.skipFailureLog) {
+            syncLogRepository.insertFailedRun(request, result);
+          }
         }
         return result;
       } catch (error) {
@@ -198,7 +281,9 @@ export const pythonTaskService = {
           'PROCESS_FAILED',
           executionError.message,
         );
-        syncLogRepository.insertFailedRun(request, result);
+        if (!options.skipFailureLog) {
+          syncLogRepository.insertFailedRun(request, result);
+        }
         return result;
       }
     }
@@ -209,7 +294,9 @@ export const pythonTaskService = {
         'PYTHON_NOT_FOUND',
         'No available Python executable was found for the crawler task.',
       );
-      syncLogRepository.insertFailedRun(request, result);
+      if (!options.skipFailureLog) {
+        syncLogRepository.insertFailedRun(request, result);
+      }
       return result;
     }
 
@@ -218,7 +305,9 @@ export const pythonTaskService = {
       'PROCESS_FAILED',
       'Crawler task failed before a Python process could be completed.',
     );
-    syncLogRepository.insertFailedRun(request, result);
+    if (!options.skipFailureLog) {
+      syncLogRepository.insertFailedRun(request, result);
+    }
     return result;
   },
 };

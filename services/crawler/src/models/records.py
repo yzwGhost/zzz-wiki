@@ -8,6 +8,32 @@ RawCatalogRecord = dict[str, Any]
 
 
 @dataclass(slots=True)
+class IncrementalSyncSummary:
+    created: int = 0
+    updated: int = 0
+    unchanged: int = 0
+    failed: int = 0
+
+    @property
+    def written_count(self) -> int:
+        return self.created + self.updated
+
+    @property
+    def total_count(self) -> int:
+        return self.created + self.updated + self.unchanged + self.failed
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "created": self.created,
+            "updated": self.updated,
+            "unchanged": self.unchanged,
+            "failed": self.failed,
+            "written_count": self.written_count,
+            "total_count": self.total_count,
+        }
+
+
+@dataclass(slots=True)
 class AgentRecord:
     id: str
     slug: str
@@ -80,6 +106,14 @@ class TaskRunResult:
     message: str
     raw_records: list[RawCatalogRecord]
     records: list[CatalogRecord]
+    incremental_summary: IncrementalSyncSummary | None = None
+
+    @property
+    def record_count(self) -> int:
+        if self.incremental_summary is not None:
+            return self.incremental_summary.written_count
+
+        return len(self.records)
 
     def to_payload(self) -> dict[str, Any]:
         return {
@@ -89,6 +123,9 @@ class TaskRunResult:
             "started_at": self.started_at,
             "finished_at": self.finished_at,
             "message": self.message,
-            "record_count": len(self.records),
+            "record_count": self.record_count,
+            "incremental_summary": self.incremental_summary.to_dict()
+            if self.incremental_summary is not None
+            else None,
             "records": [record.to_dict() for record in self.records],
         }

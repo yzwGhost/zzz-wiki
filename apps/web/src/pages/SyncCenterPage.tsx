@@ -29,6 +29,7 @@ import {
 import {
   getRecentSyncLogs,
   getSyncOverview,
+  retryFailedSyncSubtask,
   runCatalogSync,
   runBootstrapAgentsSync,
   runRealAgentsSync,
@@ -38,7 +39,10 @@ import {
 import { useAppStore } from '@/store/appStore';
 import type {
   DesktopAppInfo,
+  RetrySyncSubtaskResult,
+  RetryableSyncTaskName,
   RunSyncTaskResult,
+  SyncIncrementalSummary,
   SyncLogSummary,
   SyncOverview,
 } from '@shared/schemas/desktop';
@@ -112,14 +116,34 @@ function formatAggregateSummary(result: RunSyncTaskResult | null) {
     return null;
   }
 
+  const subtasks = summary.subtasks ?? [];
+  const failedTasks = summary.failedTasks ?? [];
+
   return {
-    subtaskCount: summary.subtasks.length,
-    failedCount: summary.failedTasks.length,
+    subtaskCount: subtasks.length,
+    failedCount: failedTasks.length,
     failedLabel:
-      summary.failedTasks.length > 0
-        ? summary.failedTasks.map((taskName) => syncTaskLabel(taskName)).join('、')
+      failedTasks.length > 0
+        ? failedTasks.map((taskName) => syncTaskLabel(taskName)).join('、')
         : '无',
+    incrementalSummary: summary.incrementalSummary,
   };
+}
+
+function formatIncrementalSummary(summary: SyncIncrementalSummary | null | undefined): string {
+  if (!summary) {
+    return '--';
+  }
+
+  return `新增 ${summary.created} / 更新 ${summary.updated} / 无变化 ${summary.unchanged} / 失败 ${summary.failed}`;
+}
+
+function isRetryableTaskName(taskName: string): taskName is RetryableSyncTaskName {
+  return (
+    taskName === 'fetch_mhy_agents' ||
+    taskName === 'fetch_mhy_weapons' ||
+    taskName === 'fetch_mhy_drive_discs'
+  );
 }
 
 function toSyncStage(
@@ -242,6 +266,8 @@ export function SyncCenterPage() {
   const [syncRunning, setSyncRunning] = useState(false);
   const [syncResult, setSyncResult] = useState<RunSyncTaskResult | null>(null);
   const [syncStage, setSyncStage] = useState<SyncStage>('idle');
+  const [retryRunningTask, setRetryRunningTask] = useState<RetryableSyncTaskName | null>(null);
+  const [retryResult, setRetryResult] = useState<RetrySyncSubtaskResult | null>(null);
 
   useEffect(() => {
     setActiveSection('sync-center');
@@ -312,9 +338,35 @@ export function SyncCenterPage() {
     }
   }
 
+  async function handleRetry(taskName: RetryableSyncTaskName, sourceLogId: string | null) {
+    setRetryRunningTask(taskName);
+
+    try {
+      const result = await retryFailedSyncSubtask(taskName, sourceLogId);
+      setRetryResult(result);
+
+      if (result.retry.ok) {
+        void message.success(`重试成功：${syncTaskLabel(taskName)} 已重新执行。`);
+      } else {
+        void message.error(`重试失败：${syncTaskLabel(taskName)} 仍未成功。`);
+      }
+
+      await loadSyncData();
+    } finally {
+      setRetryRunningTask(null);
+    }
+  }
+
   const latestLog = overview?.latestLog ?? null;
+  const latestCatalogLog =
+    logs.find((log) => log.taskName === 'sync_catalog' && log.summary) ??
+    (latestLog?.taskName === 'sync_catalog' ? latestLog : null);
   const bridgeConnected = appInfo?.bridgeStatus === 'connected';
   const aggregateSummary = formatAggregateSummary(syncResult);
+  const retryableFailures = latestCatalogLog?.summary?.retryableFailures ?? [];
+  const latestFailedTasks = latestLog?.summary?.failedTasks ?? [];
+  const latestIncrementalSummary =
+    latestLog?.summary?.incrementalSummary ?? latestLog?.incrementalSummary ?? null;
   const currentStage =
     syncRunning || syncStage === 'preparing'
       ? syncStage
@@ -330,7 +382,7 @@ export function SyncCenterPage() {
 
       <SectionCard
         title="同步总览"
-        description="这里展示最新一次同步状态，以及后续失败重试和增量同步的扩展位。"
+        description="这里展示最新一次同步状态、增量摘要、失败子任务重试入口，以及后续自动化能力的扩展位。"
         extra={
           <Space wrap>
             <Button
@@ -378,8 +430,7 @@ export function SyncCenterPage() {
                 ? `正在执行 ${syncTaskLabel(activeSyncTask)}`
                 : `执行${syncTaskLabel(activeSyncTask)}同步`}
             </Button>
-            <Button disabled>失败重试（预留）</Button>
-            <Button disabled>增量同步（预留）</Button>
+            <Button disabled>自动定时（预留）</Button>
           </Space>
         }
       >
@@ -422,8 +473,31 @@ export function SyncCenterPage() {
                   子任务 {aggregateSummary.subtaskCount} 个 / 失败 {aggregateSummary.failedCount} 个
                 </Text>
                 <Text type="secondary">失败项：{aggregateSummary.failedLabel}</Text>
+                <Text type="secondary">
+                  增量摘要：{formatIncrementalSummary(aggregateSummary.incrementalSummary)}
+                </Text>
               </Card>
             ) : null}
+
+            <Card bordered={false} className="panel sync-summary-card" style={{ marginBottom: 16 }}>
+              <Text className="sync-summary-card__label">失败子任务重试</Text>
+              {retryableFailures.length ? (
+                <Space wrap>
+                  {retryableFailures.map((item) => (
+                    <Button
+                      key={item.taskName}
+                      loading={retryRunningTask === item.taskName}
+                      disabled={!bridgeConnected}
+                      onClick={() => void handleRetry(item.taskName, latestCatalogLog?.id ?? null)}
+                    >
+                      重试{syncTaskLabel(item.taskName)}
+                    </Button>
+                  ))}
+                </Space>
+              ) : (
+                <Text type="secondary">最近一次统一同步没有可重试的失败子任务。</Text>
+              )}
+            </Card>
 
             <Card bordered={false} className="panel sync-stage-card">
               <Text className="sync-summary-card__label">执行阶段</Text>
@@ -461,9 +535,23 @@ export function SyncCenterPage() {
                 description={
                   syncResult.ok
                     ? syncResult.summary
-                      ? `任务 ${syncResult.taskName} 已完成，执行 ${syncResult.summary.subtasks.length} 个子任务，写入 ${syncResult.recordCount} 条记录。`
-                      : `任务 ${syncResult.taskName} 已完成，写入 ${syncResult.recordCount} 条记录。`
+                      ? `任务 ${syncResult.taskName} 已完成，执行 ${syncResult.summary.subtasks.length} 个子任务，写入 ${syncResult.recordCount} 条记录。增量：${formatIncrementalSummary(syncResult.summary.incrementalSummary)}`
+                      : `任务 ${syncResult.taskName} 已完成，写入 ${syncResult.recordCount} 条记录。增量：${formatIncrementalSummary(syncResult.incrementalSummary)}`
                     : createSyncFailureError(syncResult).description
+                }
+              />
+            ) : null}
+
+            {retryResult ? (
+              <Alert
+                style={{ marginTop: 12 }}
+                type={retryResult.retry.ok ? 'success' : 'error'}
+                showIcon
+                message={retryResult.retry.ok ? '失败子任务重试成功' : '失败子任务重试失败'}
+                description={
+                  retryResult.retry.ok
+                    ? `原失败任务 ${syncTaskLabel(retryResult.original.taskName)} 已重试成功，写入 ${retryResult.retry.recordCount} 条记录。增量：${formatIncrementalSummary(retryResult.retry.incrementalSummary)}`
+                    : `原失败任务 ${syncTaskLabel(retryResult.original.taskName)} 重试失败：${retryResult.retry.errorMessage}`
                 }
               />
             ) : null}
@@ -485,9 +573,17 @@ export function SyncCenterPage() {
               <Descriptions.Item label="输出路径">{latestLog?.output ?? '--'}</Descriptions.Item>
               <Descriptions.Item label="记录数">{latestLog?.recordCount ?? '--'}</Descriptions.Item>
               <Descriptions.Item label="错误码">{latestLog?.errorCode ?? '--'}</Descriptions.Item>
+              <Descriptions.Item label="增量摘要">
+                {formatIncrementalSummary(latestIncrementalSummary)}
+              </Descriptions.Item>
               <Descriptions.Item label="失败项摘要">
-                {latestLog?.summary?.failedTasks.length
-                  ? latestLog.summary.failedTasks.map((taskName) => syncTaskLabel(taskName)).join('、')
+                {latestFailedTasks.length
+                  ? latestFailedTasks.map((taskName) => syncTaskLabel(taskName)).join('、')
+                  : '--'}
+              </Descriptions.Item>
+              <Descriptions.Item label="可重试失败项">
+                {retryableFailures.length
+                  ? retryableFailures.map((item) => syncTaskLabel(item.taskName)).join('、')
                   : '--'}
               </Descriptions.Item>
             </Descriptions>
@@ -525,6 +621,12 @@ export function SyncCenterPage() {
                     <Descriptions.Item label="记录数">{record.recordCount ?? '--'}</Descriptions.Item>
                     <Descriptions.Item label="退出码">{record.exitCode ?? '--'}</Descriptions.Item>
                     <Descriptions.Item label="目标">{record.target ?? '--'}</Descriptions.Item>
+                    <Descriptions.Item label="重试动作">
+                      {record.retry?.isRetry ? '是' : '--'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="重试来源日志">
+                      {record.retry?.sourceLogId ?? '--'}
+                    </Descriptions.Item>
                   </Descriptions>
                   {record.summary ? (
                     <Descriptions bordered size="small" column={1} style={{ marginTop: 12 }}>
@@ -533,6 +635,22 @@ export function SyncCenterPage() {
                           record.summary.failedTasks.length
                             ? record.summary.failedTasks.map((taskName) => syncTaskLabel(taskName)).join('、')
                             : '无'
+                        }；增量：${formatIncrementalSummary(record.summary.incrementalSummary)}`}
+                      </Descriptions.Item>
+                    </Descriptions>
+                  ) : null}
+                  {record.incrementalSummary ? (
+                    <Descriptions bordered size="small" column={1} style={{ marginTop: 12 }}>
+                      <Descriptions.Item label="增量结果">
+                        {formatIncrementalSummary(record.incrementalSummary)}
+                      </Descriptions.Item>
+                    </Descriptions>
+                  ) : null}
+                  {record.retry ? (
+                    <Descriptions bordered size="small" column={1} style={{ marginTop: 12 }}>
+                      <Descriptions.Item label="重试元数据">
+                        {`原任务：${syncTaskLabel(record.retry.originalTaskName)}；来源：${record.retry.sourceTaskName}；时间：${record.retry.retriedAt}；结果：${
+                          record.retry.success ? '成功' : '失败'
                         }`}
                       </Descriptions.Item>
                     </Descriptions>
@@ -556,7 +674,8 @@ export function SyncCenterPage() {
                     record.errorCode ||
                     record.output ||
                     record.sourceName ||
-                    record.summary,
+                    record.summary ||
+                    record.retry,
                 ),
             }}
             rowClassName={(record) => `sync-log-row sync-log-row--${record.status}`}
@@ -576,8 +695,8 @@ export function SyncCenterPage() {
         description="保留后续失败重试、增量同步和多任务管理所需的位置，但这一阶段不实现复杂调度。"
       >
         <Space direction="vertical" size={8} style={{ display: 'flex' }}>
-          <Paragraph>失败重试：后续可基于最近失败日志直接回填任务参数，一键重跑。</Paragraph>
-          <Paragraph>增量同步：后续可在 Python adapter 内基于源站时间戳或 hash 增量抓取。</Paragraph>
+          <Paragraph>失败重试：当前已支持最近一次统一同步中的失败子任务人工单次重试。</Paragraph>
+          <Paragraph>增量同步：当前已支持基于 SQLite 现有记录的最小增量判断，后续可继续细化到源站 hash 或时间戳策略。</Paragraph>
           <Paragraph>多任务队列：后续可增加任务列表、运行中状态和更细粒度日志详情。</Paragraph>
         </Space>
       </SectionCard>

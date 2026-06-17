@@ -4,6 +4,8 @@ import { getDatabase } from '../db/client';
 import type {
   RunSyncTaskRequest,
   RunSyncTaskResult,
+  SyncIncrementalSummary,
+  SyncRetryMetadata,
   SyncTaskAggregateSummary,
   SyncLogSummary,
   SyncOverview,
@@ -30,7 +32,16 @@ interface SyncPayloadShape {
   exitCode?: number;
   source_name?: string;
   sourceName?: string;
+  incremental_summary?: SyncIncrementalSummary & {
+    written_count?: number;
+    total_count?: number;
+  };
+  incrementalSummary?: SyncIncrementalSummary & {
+    written_count?: number;
+    total_count?: number;
+  };
   summary?: SyncTaskAggregateSummary;
+  retry?: SyncRetryMetadata;
 }
 
 function parsePayload(payloadJson: string): SyncPayloadShape {
@@ -39,6 +50,85 @@ function parsePayload(payloadJson: string): SyncPayloadShape {
   } catch {
     return {};
   }
+}
+
+function normalizeIncrementalSummary(
+  summary:
+    | (Partial<SyncIncrementalSummary> & {
+        written_count?: number;
+        total_count?: number;
+      })
+    | null
+    | undefined,
+): SyncIncrementalSummary | null {
+  if (!summary) {
+    return null;
+  }
+
+  const created = typeof summary.created === 'number' ? summary.created : 0;
+  const updated = typeof summary.updated === 'number' ? summary.updated : 0;
+  const unchanged = typeof summary.unchanged === 'number' ? summary.unchanged : 0;
+  const failed = typeof summary.failed === 'number' ? summary.failed : 0;
+  const writtenCount =
+    typeof summary.writtenCount === 'number'
+      ? summary.writtenCount
+      : typeof summary.written_count === 'number'
+        ? summary.written_count
+        : created + updated;
+  const totalCount =
+    typeof summary.totalCount === 'number'
+      ? summary.totalCount
+      : typeof summary.total_count === 'number'
+        ? summary.total_count
+        : created + updated + unchanged + failed;
+
+  return {
+    created,
+    updated,
+    unchanged,
+    failed,
+    writtenCount,
+    totalCount,
+  };
+}
+
+function normalizeAggregateSummary(
+  summary: SyncTaskAggregateSummary | undefined,
+): SyncTaskAggregateSummary | null {
+  if (!summary) {
+    return null;
+  }
+
+  return {
+    overallStatus: summary.overallStatus,
+    startedAt: summary.startedAt,
+    finishedAt: summary.finishedAt,
+    failedTasks: Array.isArray(summary.failedTasks) ? summary.failedTasks : [],
+    subtasks: Array.isArray(summary.subtasks)
+      ? summary.subtasks.map((task) => ({
+          ...task,
+          incrementalSummary:
+            normalizeIncrementalSummary(task.incrementalSummary) ?? {
+              created: 0,
+              updated: 0,
+              unchanged: 0,
+              failed: task.status === 'failed' ? 1 : 0,
+              writtenCount: 0,
+              totalCount: task.status === 'failed' ? 1 : 0,
+            },
+        }))
+      : [],
+    retryableFailures: Array.isArray(summary.retryableFailures) ? summary.retryableFailures : [],
+    incrementalSummary:
+      normalizeIncrementalSummary(summary.incrementalSummary) ?? {
+        created: 0,
+        updated: 0,
+        unchanged: 0,
+        failed: 0,
+        writtenCount: 0,
+        totalCount: 0,
+      },
+  };
 }
 
 function mapRowToSummary(row: SyncLogRow): SyncLogSummary {
@@ -64,7 +154,11 @@ function mapRowToSummary(row: SyncLogRow): SyncLogSummary {
     stderr: payload.stderr ?? null,
     exitCode: typeof payload.exitCode === 'number' ? payload.exitCode : null,
     sourceName: payload.source_name ?? payload.sourceName ?? null,
-    summary: payload.summary ?? null,
+    summary: normalizeAggregateSummary(payload.summary),
+    retry: payload.retry ?? null,
+    incrementalSummary: normalizeIncrementalSummary(
+      payload.incremental_summary ?? payload.incrementalSummary,
+    ),
   };
 }
 
@@ -154,6 +248,7 @@ export const syncLogRepository = {
         stderr: result.stderr,
         exitCode: result.exitCode,
         summary: result.summary ?? null,
+        incrementalSummary: result.incrementalSummary ?? null,
       }),
     });
   },

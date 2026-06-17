@@ -5,7 +5,13 @@ import sqlite3
 from contextlib import closing
 
 from src.exporters.base import Exporter
-from src.models.records import AgentRecord, DriveDiscRecord, TaskRunResult, WeaponRecord
+from src.models.records import (
+    AgentRecord,
+    DriveDiscRecord,
+    IncrementalSyncSummary,
+    TaskRunResult,
+    WeaponRecord,
+)
 from src.utils.paths import get_storage_db_path
 
 
@@ -161,6 +167,30 @@ DELETE FROM drive_discs
 WHERE source_url LIKE 'https://example.com/drive-discs/%' OR source_url = '';
 """
 
+SELECT_AGENT_BY_SLUG_SQL = """
+SELECT
+  id, slug, name, name_en, rarity, element, role, faction, avatar, cover,
+  summary, skill_intro, game_version, released_at, updated_at, source_url
+FROM agents
+WHERE slug = ?;
+"""
+
+SELECT_WEAPON_BY_SLUG_SQL = """
+SELECT
+  id, slug, name, rarity, image, base_stat, sub_stat, effect_desc,
+  fit_roles_json, fit_agents_json, source_url, updated_at
+FROM weapons
+WHERE slug = ?;
+"""
+
+SELECT_DRIVE_DISC_BY_SLUG_SQL = """
+SELECT
+  id, slug, name, image, two_piece_effect, four_piece_effect,
+  fit_agents_json, fit_scenes_json, source_url, updated_at
+FROM drive_discs
+WHERE slug = ?;
+"""
+
 
 def ensure_weapon_image_column(connection: sqlite3.Connection) -> None:
     columns = connection.execute("PRAGMA table_info(weapons);").fetchall()
@@ -192,6 +222,97 @@ def ensure_drive_disc_image_column(connection: sqlite3.Connection) -> None:
         )
 
 
+def build_agent_snapshot(record: AgentRecord) -> dict[str, object]:
+    return record.to_dict()
+
+
+def build_weapon_snapshot(record: WeaponRecord) -> dict[str, object]:
+    return {
+        "id": record.id,
+        "slug": record.slug,
+        "name": record.name,
+        "rarity": record.rarity,
+        "image": record.image,
+        "base_stat": record.base_stat,
+        "sub_stat": record.sub_stat,
+        "effect_desc": record.effect_desc,
+        "fit_roles_json": json.dumps(record.fit_roles, ensure_ascii=False),
+        "fit_agents_json": json.dumps(record.fit_agents, ensure_ascii=False),
+        "source_url": record.source_url,
+        "updated_at": record.updated_at,
+    }
+
+
+def build_drive_disc_snapshot(record: DriveDiscRecord) -> dict[str, object]:
+    return {
+        "id": record.id,
+        "slug": record.slug,
+        "name": record.name,
+        "image": record.image,
+        "two_piece_effect": record.two_piece_effect,
+        "four_piece_effect": record.four_piece_effect,
+        "fit_agents_json": json.dumps(record.fit_agents, ensure_ascii=False),
+        "fit_scenes_json": json.dumps(record.fit_scenes, ensure_ascii=False),
+        "source_url": record.source_url,
+        "updated_at": record.updated_at,
+    }
+
+
+def fetch_existing_snapshot(
+    connection: sqlite3.Connection, record: AgentRecord | WeaponRecord | DriveDiscRecord
+) -> dict[str, object] | None:
+    if isinstance(record, AgentRecord):
+        row = connection.execute(SELECT_AGENT_BY_SLUG_SQL, (record.slug,)).fetchone()
+    elif isinstance(record, WeaponRecord):
+        row = connection.execute(SELECT_WEAPON_BY_SLUG_SQL, (record.slug,)).fetchone()
+    else:
+        row = connection.execute(SELECT_DRIVE_DISC_BY_SLUG_SQL, (record.slug,)).fetchone()
+
+    if row is None:
+        return None
+
+    return dict(row)
+
+
+def build_record_snapshot(
+    record: AgentRecord | WeaponRecord | DriveDiscRecord,
+) -> dict[str, object]:
+    if isinstance(record, AgentRecord):
+        return build_agent_snapshot(record)
+    if isinstance(record, WeaponRecord):
+        return build_weapon_snapshot(record)
+    return build_drive_disc_snapshot(record)
+
+
+def upsert_record(
+    connection: sqlite3.Connection, record: AgentRecord | WeaponRecord | DriveDiscRecord
+) -> None:
+    if isinstance(record, AgentRecord):
+        connection.execute(UPSERT_AGENT_SQL, record.to_dict())
+        return
+
+    payload = record.to_dict()
+    if isinstance(record, WeaponRecord):
+        connection.execute(
+            UPSERT_WEAPON_SQL,
+            {
+                **payload,
+                "fit_roles_json": json.dumps(payload["fit_roles"], ensure_ascii=False),
+                "fit_agents_json": json.dumps(payload["fit_agents"], ensure_ascii=False),
+            },
+        )
+        return
+
+    connection.execute(
+        UPSERT_DRIVE_DISC_SQL,
+        {
+            **payload,
+            "fit_agents_json": json.dumps(payload["fit_agents"], ensure_ascii=False),
+            "fit_scenes_json": json.dumps(payload["fit_scenes"], ensure_ascii=False),
+        },
+    )
+
+
 class SqliteExporter(Exporter):
     target_name = "sqlite"
 
@@ -200,6 +321,7 @@ class SqliteExporter(Exporter):
         database_path.parent.mkdir(parents=True, exist_ok=True)
 
         with closing(sqlite3.connect(database_path)) as connection:
+            connection.row_factory = sqlite3.Row
             connection.execute(CREATE_AGENTS_TABLE_SQL)
             connection.execute(CREATE_WEAPONS_TABLE_SQL)
             connection.execute(CREATE_DRIVE_DISCS_TABLE_SQL)
@@ -213,29 +335,24 @@ class SqliteExporter(Exporter):
                 connection.execute(DELETE_MOCK_WEAPONS_SQL)
             if any(isinstance(record, DriveDiscRecord) for record in result.records):
                 connection.execute(DELETE_MOCK_DRIVE_DISCS_SQL)
+            incremental_summary = IncrementalSyncSummary()
             for record in result.records:
-                if isinstance(record, AgentRecord):
-                    connection.execute(UPSERT_AGENT_SQL, record.to_dict())
-                elif isinstance(record, WeaponRecord):
-                    payload = record.to_dict()
-                    connection.execute(
-                        UPSERT_WEAPON_SQL,
-                        {
-                            **payload,
-                            "fit_roles_json": json.dumps(payload["fit_roles"], ensure_ascii=False),
-                            "fit_agents_json": json.dumps(payload["fit_agents"], ensure_ascii=False),
-                        },
-                    )
-                elif isinstance(record, DriveDiscRecord):
-                    payload = record.to_dict()
-                    connection.execute(
-                        UPSERT_DRIVE_DISC_SQL,
-                        {
-                            **payload,
-                            "fit_agents_json": json.dumps(payload["fit_agents"], ensure_ascii=False),
-                            "fit_scenes_json": json.dumps(payload["fit_scenes"], ensure_ascii=False),
-                        },
-                    )
+                next_snapshot = build_record_snapshot(record)
+                existing_snapshot = fetch_existing_snapshot(connection, record)
+
+                if existing_snapshot is None:
+                    upsert_record(connection, record)
+                    incremental_summary.created += 1
+                    continue
+
+                if existing_snapshot == next_snapshot:
+                    incremental_summary.unchanged += 1
+                    continue
+
+                upsert_record(connection, record)
+                incremental_summary.updated += 1
+
+            result.incremental_summary = incremental_summary
 
             connection.execute(
                 INSERT_SYNC_LOG_SQL,

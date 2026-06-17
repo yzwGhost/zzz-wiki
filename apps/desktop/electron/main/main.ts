@@ -23,6 +23,9 @@ function createAppInfo(): DesktopAppInfo {
 function registerIpcHandlers() {
   ipcMain.handle(IPC_CHANNELS.app.getInfo, () => createAppInfo());
   ipcMain.handle(IPC_CHANNELS.sync.runTask, (_, request) => syncBridgeService.runTask(request));
+  ipcMain.handle(IPC_CHANNELS.sync.retrySubtask, (_, request) =>
+    syncBridgeService.retrySubtask(request),
+  );
   ipcMain.handle(IPC_CHANNELS.sync.getOverview, () => syncBridgeService.getOverview());
   ipcMain.handle(IPC_CHANNELS.sync.getRecentLogs, (_, limit?: number) =>
     syncBridgeService.getRecentLogs(limit),

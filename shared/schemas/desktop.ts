@@ -37,11 +37,25 @@ export type SyncTaskName =
   | 'fetch_mhy_weapons'
   | 'fetch_mhy_drive_discs';
 
+export type RetryableSyncTaskName =
+  | 'fetch_mhy_agents'
+  | 'fetch_mhy_weapons'
+  | 'fetch_mhy_drive_discs';
+
 export type SyncTaskTarget = 'json' | 'sqlite';
 
 export interface RunSyncTaskRequest {
   taskName: SyncTaskName;
   target: SyncTaskTarget;
+}
+
+export interface SyncIncrementalSummary {
+  created: number;
+  updated: number;
+  unchanged: number;
+  failed: number;
+  writtenCount: number;
+  totalCount: number;
 }
 
 export interface SyncSubtaskSummary {
@@ -54,6 +68,15 @@ export interface SyncSubtaskSummary {
   recordCount: number;
   output: string | null;
   errorCode: string | null;
+  retryable?: boolean;
+  incrementalSummary: SyncIncrementalSummary;
+}
+
+export interface RetryableSyncSubtask {
+  taskName: RetryableSyncTaskName;
+  target: SyncTaskTarget;
+  reason: string;
+  canRetry: true;
 }
 
 export interface SyncTaskAggregateSummary {
@@ -62,6 +85,8 @@ export interface SyncTaskAggregateSummary {
   finishedAt: string;
   failedTasks: string[];
   subtasks: SyncSubtaskSummary[];
+  retryableFailures: RetryableSyncSubtask[];
+  incrementalSummary: SyncIncrementalSummary;
 }
 
 export interface SyncTaskSuccessResult {
@@ -78,6 +103,7 @@ export interface SyncTaskSuccessResult {
   message?: string;
   sourceName?: string;
   summary?: SyncTaskAggregateSummary | null;
+  incrementalSummary?: SyncIncrementalSummary | null;
 }
 
 export interface SyncTaskFailureResult {
@@ -96,9 +122,35 @@ export interface SyncTaskFailureResult {
   recordCount?: number;
   output?: string;
   summary?: SyncTaskAggregateSummary | null;
+  incrementalSummary?: SyncIncrementalSummary | null;
 }
 
 export type RunSyncTaskResult = SyncTaskSuccessResult | SyncTaskFailureResult;
+
+export interface RetrySyncSubtaskRequest {
+  taskName: RetryableSyncTaskName;
+  target: SyncTaskTarget;
+  sourceLogId: string | null;
+  sourceTaskName: 'sync_catalog';
+}
+
+export interface RetrySyncSubtaskResult {
+  original: RetryableSyncSubtask & {
+    sourceLogId: string | null;
+    sourceTaskName: 'sync_catalog';
+  };
+  retry: RunSyncTaskResult;
+  retriedAt: string;
+}
+
+export interface SyncRetryMetadata {
+  isRetry: true;
+  sourceLogId: string | null;
+  sourceTaskName: string;
+  originalTaskName: RetryableSyncTaskName;
+  retriedAt: string;
+  success: boolean;
+}
 
 export interface SyncLogSummary {
   id: string;
@@ -116,6 +168,8 @@ export interface SyncLogSummary {
   exitCode?: number | null;
   sourceName?: string | null;
   summary?: SyncTaskAggregateSummary | null;
+  retry?: SyncRetryMetadata | null;
+  incrementalSummary?: SyncIncrementalSummary | null;
 }
 
 export interface SyncOverview {
@@ -129,6 +183,7 @@ export interface SyncOverview {
 
 export interface DesktopSyncApi {
   runTask: (request: RunSyncTaskRequest) => Promise<RunSyncTaskResult>;
+  retrySubtask: (request: RetrySyncSubtaskRequest) => Promise<RetrySyncSubtaskResult>;
   getOverview: () => Promise<SyncOverview>;
   getRecentLogs: (limit?: number) => Promise<SyncLogSummary[]>;
 }

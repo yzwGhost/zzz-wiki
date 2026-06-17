@@ -1,9 +1,12 @@
 import { syncLogRepository } from '../repositories/syncLogRepository';
 import { pythonTaskService } from './pythonTaskService';
 import { syncCatalogTaskService } from './syncCatalogTaskService';
+import { syncRetryTaskService } from './syncRetryTaskService';
 import type {
   RunSyncTaskRequest,
   RunSyncTaskResult,
+  RetrySyncSubtaskRequest,
+  RetrySyncSubtaskResult,
   SyncLogSummary,
   SyncOverview,
 } from '../../../../../shared/schemas/desktop';
@@ -15,6 +18,10 @@ export const syncBridgeService = {
     }
 
     return pythonTaskService.runTask(request);
+  },
+
+  retrySubtask(request: RetrySyncSubtaskRequest): Promise<RetrySyncSubtaskResult> {
+    return syncRetryTaskService.retrySubtask(request);
   },
 
   getOverview(): SyncOverview {
